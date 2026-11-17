@@ -229,8 +229,8 @@ input:checked + .toggle-slider:before{transform:translateX(22px);}
   <div class="card">
     <div class="track-row">
       <div class="track-info">
-        <h3>Rastreamento GPS</h3>
-        <p id="track-sub">Desligado</p>
+        <h3>Gravar Trajeto</h3>
+        <p id="track-sub">Desligado — GPS ativo, trajeto não gravado</p>
       </div>
       <label class="toggle-wrap">
         <input type="checkbox" id="track-toggle" onchange="onTrackToggle()">
@@ -445,12 +445,12 @@ function updateTrackUI(){
   const st=document.getElementById('odo-status');
   if(tracking){
     dot.className='odo-dot on';
-    sub.textContent='Ativo — gravando posições';
-    st.textContent='Rastreando';
+    sub.textContent='Ligado — gravando trajeto';
+    st.textContent='Gravando trajeto';
   }else{
-    dot.className='odo-dot';
-    sub.textContent='Desligado';
-    st.textContent='GPS inativo';
+    dot.className='odo-dot on';
+    sub.textContent='Desligado — GPS ativo, trajeto não gravado';
+    st.textContent='GPS ativo';
   }
 }
 function renderPoints(){
@@ -527,19 +527,20 @@ function onPosition(pos){
   curLat=lat; curLon=lon;
   updateBanner('ok','GPS ativo · Precisão: '+Math.round(curAcc)+'m');
 
-  if(!tracking) return;
-
+  // Sempre atualiza odômetro, mesmo sem gravar trajeto
   if(lastLat!==null){
     const d=haversine(lastLat,lastLon,lat,lon);
-    if(d>0.002){ // filtro 2m
+    if(d>0.002){ // filtro 2m — evita ruído parado
       distTotal+=d;
       curKm=dir==='C'?kmIni+distTotal:kmIni-distTotal;
-      trackPoints.push({lat,lon,km:curKm});
+      // Grava no trajeto só se o toggle estiver ligado
+      if(tracking) trackPoints.push({lat,lon,km:curKm});
       updateOdo();
       save();
     }
   } else {
-    trackPoints.push({lat,lon,km:curKm});
+    // Primeiro fix — só grava no trajeto se toggle ligado
+    if(tracking) trackPoints.push({lat,lon,km:curKm});
   }
   lastLat=lat; lastLon=lon;
 }
@@ -557,12 +558,10 @@ function haversine(la1,lo1,la2,lo2){
 function onTrackToggle(){
   tracking=document.getElementById('track-toggle').checked;
   if(tracking){
+    // Ao ligar gravação, reseta referência de posição para não somar gap parado
     lastLat=null; lastLon=null;
-    startGps();
-  } else {
-    stopGps();
-    updateBanner('warn','GPS pausado');
   }
+  // GPS continua rodando sempre — toggle só controla gravação do trajeto
   updateTrackUI();
   save();
 }
@@ -730,6 +729,8 @@ load();
 updateOdo();
 updateTrackUI();
 renderPoints();
+// GPS inicia sempre — odômetro funciona independente do toggle
+startGps();
 </script>
 <!-- JSZip para exportar KMZ -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
