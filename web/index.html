@@ -154,6 +154,13 @@ input:checked + .toggle-slider:before{transform:translateX(22px);}
 .btn-exp-fmt span{font-size:20px;}
 .btn-kml{background:#E8F5E9;color:var(--green2);border-color:#A5D6A7;}
 .btn-kmz{background:#E3F2FD;color:var(--blue2);border-color:#90CAF9;}
+.btn-pdf{background:#FFF3E0;color:#E65100;border-color:#FFCC80;}
+
+/* ── LAT/LON ── */
+.odo-latlon{text-align:center;font-size:11px;color:rgba(255,255,255,.55);margin-top:2px;font-family:monospace;letter-spacing:.3px;}
+
+/* ── GPS FRACO ── */
+.gps-banner.weak{background:#FFF8E1;color:#F57F17;}
 </style>
 </head>
 <body>
@@ -192,6 +199,7 @@ input:checked + .toggle-slider:before{transform:translateX(22px);}
       </div>
       <div class="odo-hint">✎ toque para editar km e sentido</div>
     </div>
+    <div class="odo-latlon" id="odo-latlon">— aguardando GPS —</div>
 
     <!-- Edit panel -->
     <div class="edit-panel" id="edit-panel">
@@ -279,6 +287,7 @@ input:checked + .toggle-slider:before{transform:translateX(22px);}
     <div class="exp-row">
       <button class="btn-exp-fmt btn-kml" onclick="exportKML()"><span>🗺️</span>KML</button>
       <button class="btn-exp-fmt btn-kmz" onclick="exportKMZ()"><span>📦</span>KMZ</button>
+      <button class="btn-exp-fmt btn-pdf" onclick="exportPDF()"><span>📄</span>PDF</button>
     </div>
   </div>
 
@@ -374,12 +383,14 @@ let kmIni = 0;          // km de referência inicial
 let curKm = 0;          // posição atual (km decimal)
 let distTotal = 0;      // distância percorrida (km)
 let tracking = false;
-let lastLat = null, lastLon = null;
+let lastLat = null, lastLon = null, lastTime = null;
 let curLat = null, curLon = null, curAcc = 0, curSpd = 0;
 let watchId = null;
 let trackPoints = [];   // [{lat,lon,km}]
 let points = [];        // pontos registrados pelo usuário
 let pointTypes = [];    // tipos personalizáveis
+const ACC_MAX = 40;     // precisão máxima aceita (metros) — rejeita fix ruim
+const SPD_MAX = 150;    // velocidade máxima aceita (km/h) — rejeita salto GPS
 
 // ══════════════════════════════
 //  PERSISTÊNCIA
@@ -429,11 +440,16 @@ function updateOdo(){
   document.getElementById('odo-km').textContent=k;
   document.getElementById('odo-m').textContent=m;
   document.getElementById('b-dist').textContent=fmtFull(distTotal);
-  document.getElementById('b-spd').textContent=Math.round(curSpd*3.6);
+  document.getElementById('b-spd').textContent=Math.round(curSpd);  // já em km/h
   document.getElementById('b-pts').textContent=points.length;
   document.getElementById('stat-ini').textContent=fmtFull(kmIni);
   document.getElementById('stat-pts').textContent=points.length;
   document.getElementById('stat-track').textContent=trackPoints.length;
+  // lat/lon
+  if(curLat!==null){
+    const ll=document.getElementById('odo-latlon');
+    if(ll) ll.textContent=curLat.toFixed(6)+'°, '+curLon.toFixed(6)+'°';
+  }
   // dir pill
   const p=document.getElementById('pill-dir');
   if(dir==='C'){p.textContent='▲ Crescente';p.className='pill pill-dir cresc';}
@@ -465,6 +481,7 @@ function renderPoints(){
       <div class="pt-info">
         <div class="pt-desc">${p.type}</div>
         <div class="pt-km">${fmtFull(p.km)}${p.obs?' · '+p.obs:''}</div>
+        ${p.lat?`<div class="pt-km" style="font-family:monospace;color:#607D8B;">${p.lat.toFixed(6)}°, ${p.lon.toFixed(6)}°</div>`:''}
         ${p.w||p.l||p.h?`<div class="pt-km" style="color:#1565C0;">📏 ${p.w?'L:'+p.w+'m ':''} ${p.l?'C:'+p.l+'m ':''} ${p.h?'E:'+p.h+'cm':''}</div>`:''}
       </div>
       <button class="pt-del" onclick="delPoint(${i})">🗑</button>
@@ -522,27 +539,43 @@ function stopGps(){
 function onPosition(pos){
   const lat=pos.coords.latitude;
   const lon=pos.coords.longitude;
-  curAcc=pos.coords.accuracy||0;
-  curSpd=pos.coords.speed||0;
-  curLat=lat; curLon=lon;
-  updateBanner('ok','GPS ativo · Precisão: '+Math.round(curAcc)+'m');
+  const acc=Math.abs(pos.coords.accuracy||999); // Math.abs por segurança
+  const now=Date.now();
 
-  // Sempre atualiza odômetro, mesmo sem gravar trajeto
-  if(lastLat!==null){
-    const d=haversine(lastLat,lastLon,lat,lon);
-    if(d>0.002){ // filtro 2m — evita ruído parado
+  curLat=lat; curLon=lon; curAcc=acc;
+
+  // Sempre mostra lat/lon e velocidade
+  updateOdo();
+
+  if(acc>ACC_MAX){
+    updateBanner('weak','⚠️ GPS fraco · Precisão: '+Math.round(acc)+'m — aguardando melhor sinal');
+    return; // não acumula distância com sinal ruim
+  }
+
+  updateBanner('ok','GPS ativo · Precisão: '+Math.round(acc)+'m');
+
+  if(lastLat!==null && lastTime!==null){
+    const d=haversine(lastLat,lastLon,lat,lon);         // km
+    const dt=(now-lastTime)/3600000;                    // horas
+    const spd=dt>0?d/dt:0;                              // km/h
+
+    if(spd>SPD_MAX){
+      // Salto GPS — atualiza referência mas não acumula
+      lastLat=lat; lastLon=lon; lastTime=now;
+      return;
+    }
+    if(d>0.003){ // filtro 3m — evita ruído estático
       distTotal+=d;
       curKm=dir==='C'?kmIni+distTotal:kmIni-distTotal;
-      // Grava no trajeto só se o toggle estiver ligado
+      curSpd=spd; // km/h
       if(tracking) trackPoints.push({lat,lon,km:curKm});
       updateOdo();
       save();
     }
   } else {
-    // Primeiro fix — só grava no trajeto se toggle ligado
     if(tracking) trackPoints.push({lat,lon,km:curKm});
   }
-  lastLat=lat; lastLon=lon;
+  lastLat=lat; lastLon=lon; lastTime=now;
 }
 
 function haversine(la1,lo1,la2,lo2){
@@ -720,6 +753,55 @@ function dl(blob,name){
 function dateSuffix(){
   const d=new Date();
   return d.toISOString().slice(0,10).replace(/-/g,'');
+}
+
+// ══════════════════════════════
+//  EXPORT PDF (via print)
+// ══════════════════════════════
+function exportPDF(){
+  if(!points.length){alert('Nenhum ponto registrado para gerar relatório.');return;}
+  const dt=new Date().toLocaleString('pt-BR');
+  const rows=points.map((p,i)=>{
+    const dims=[];
+    if(p.w) dims.push('Largura: '+p.w+' m');
+    if(p.l) dims.push('Comprimento: '+p.l+' m');
+    if(p.h) dims.push('Espessura: '+p.h+' cm');
+    return`<tr>
+      <td>${i+1}</td>
+      <td><strong>${p.type}</strong>${p.obs?'<br><span class="obs">'+p.obs+'</span>':''}</td>
+      <td>${fmtFull(p.km)}</td>
+      <td class="mono">${p.lat?p.lat.toFixed(6)+'<br>'+p.lon.toFixed(6):'—'}</td>
+      <td>${dims.length?dims.join('<br>'):'—'}</td>
+    </tr>`;
+  }).join('');
+  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Relatório de Pontos — Odômetro Rodovia Pro</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px;}
+h1{font-size:16px;color:#003F87;margin-bottom:2px;}
+.sub{font-size:11px;color:#555;margin-bottom:16px;}
+table{width:100%;border-collapse:collapse;}
+th{background:#003F87;color:#fff;padding:7px 8px;text-align:left;font-size:10px;text-transform:uppercase;}
+td{padding:7px 8px;border-bottom:1px solid #e0e0e0;vertical-align:top;}
+tr:nth-child(even) td{background:#f5f8ff;}
+.obs{color:#555;font-style:italic;}
+.mono{font-family:monospace;font-size:10px;}
+.footer{margin-top:16px;font-size:10px;color:#888;text-align:right;}
+@media print{body{padding:0;}}
+</style></head><body>
+<h1>Relatório de Pontos — Odômetro Rodovia Pro</h1>
+<div class="sub">DVAbrao Serviços Ltda &nbsp;·&nbsp; Gerado em: ${dt} &nbsp;·&nbsp; KM Inicial: ${fmtFull(kmIni)} &nbsp;·&nbsp; Sentido: ${dir==='C'?'Crescente':'Decrescente'}</div>
+<table>
+<thead><tr><th>#</th><th>Tipo / Descrição</th><th>Posição (KM)</th><th>Coordenadas</th><th>Dimensões</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+<div class="footer">Total: ${points.length} ponto(s) registrado(s)</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+  const w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
+  else alert('Permita pop-ups para gerar o PDF.');
 }
 
 // ══════════════════════════════
