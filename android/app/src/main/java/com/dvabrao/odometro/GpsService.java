@@ -154,7 +154,6 @@ public class GpsService extends Service {
                 .setContentText(getString(R.string.notif_text))
                 .setContentIntent(pi)
                 .setOngoing(true)
-                .setSilent(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .build();
     }
