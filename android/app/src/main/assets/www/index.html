@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Odômetro Rodovia Pro</title>
+<style>
+:root{
+  --blue:#111D3D;--blue2:#1A2F5E;--green:#1B5E20;--green2:#2E7D32;
+  --yellow:#F5C500;--yellow2:#FFD740;
+  --red:#B71C1C;--red2:#C62828;--orange:#E65100;--gray:#607D8B;
+  --bg:#F0F4F8;--card:#FFFFFF;--text:#111D3D;--sub:#546E7A;--border:#CFD8DC;
+  --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;
+  padding-top:calc(var(--safe-top) + 8px);padding-bottom:calc(var(--safe-bot)+8px);}
+
+/* ── HEADER ── */
+.header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--card);
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.logo-wrap{width:48px;height:48px;border-radius:10px;overflow:hidden;flex-shrink:0;
+  background:#f0f4f8;display:flex;align-items:center;justify-content:center;}
+.logo-wrap img{width:100%;height:100%;object-fit:contain;}
+.logo-fallback{background:#003F87;width:48px;height:48px;border-radius:10px;display:flex;
+  align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;}
+.header-title{flex:1;}
+.header-title h1{font-size:16px;font-weight:800;color:var(--blue);line-height:1.2;}
+.header-title p{font-size:11px;color:var(--sub);}
+.btn-icon{width:40px;height:40px;border-radius:10px;border:1px solid var(--border);background:var(--card);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;flex-shrink:0;}
+
+/* ── MAIN ── */
+.main{padding:10px 10px 80px;}
+
+/* ── CARD ── */
+.card{background:var(--card);border-radius:16px;padding:14px 16px;margin-bottom:10px;
+  box-shadow:0 1px 4px rgba(0,0,0,.07);}
+.card-label{font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--sub);
+  text-transform:uppercase;margin-bottom:8px;}
+
+/* ── ODOMETER ── */
+.odo-card{background:linear-gradient(135deg,#111D3D 0%,#1A2F5E 100%);border-radius:18px;
+  padding:16px 14px 14px;margin-bottom:10px;box-shadow:0 4px 16px rgba(17,29,61,.35);}
+.odo-status-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+.odo-dot{width:8px;height:8px;border-radius:50%;background:#9E9E9E;flex-shrink:0;transition:.3s;}
+.odo-dot.on{background:#F5C500;box-shadow:0 0 6px #F5C500;}
+.odo-dot.weak{background:#FFD54F;}
+.odo-status-txt{font-size:11px;color:rgba(255,255,255,.75);flex:1;}
+.pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:none;}
+.pill-dir{background:rgba(255,255,255,.15);color:#fff;}
+.pill-dir.cresc{background:rgba(245,197,0,.25);color:#F5C500;}
+.pill-dir.decresc{background:rgba(255,138,128,.2);color:#FF8A80;}
+.odo-big{text-align:center;cursor:pointer;user-select:none;padding:2px 0;}
+.odo-km{font-size:60px;font-weight:800;color:#fff;line-height:1;letter-spacing:-2px;}
+.odo-sep{font-size:36px;font-weight:300;color:rgba(255,255,255,.5);margin:0 2px;}
+.odo-m{font-size:60px;font-weight:800;color:rgba(255,255,255,.85);line-height:1;letter-spacing:-2px;}
+.odo-hint{text-align:center;font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;}
+.odo-latlon{text-align:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:3px;
+  font-family:monospace;letter-spacing:.2px;}
+.odo-sub-row{display:flex;gap:5px;margin-top:10px;}
+.odo-badge{flex:1;background:rgba(255,255,255,.12);border-radius:9px;padding:6px 4px;text-align:center;}
+.odo-badge span{display:block;font-size:11px;font-weight:700;color:#fff;}
+.odo-badge small{font-size:9px;color:rgba(255,255,255,.55);text-transform:uppercase;}
+
+/* ── EDIT PANEL ── */
+.edit-panel{background:rgba(255,255,255,.12);border-radius:14px;padding:12px;margin-top:10px;display:none;}
+.edit-row{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+.edit-inp{flex:1;background:rgba(255,255,255,.9);border:none;border-radius:10px;padding:9px 6px;
+  font-size:20px;font-weight:700;color:var(--blue);text-align:center;outline:none;min-width:0;}
+.edit-plus{font-size:20px;color:rgba(255,255,255,.5);flex-shrink:0;}
+.dir-row{display:flex;gap:8px;margin-bottom:10px;}
+.dir-btn{flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;
+  border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);}
+.dir-btn.sel-c{background:rgba(105,240,174,.25);color:#69F0AE;border-color:#69F0AE;}
+.dir-btn.sel-d{background:rgba(255,138,128,.25);color:#FF8A80;border-color:#FF8A80;}
+.btn-apply{width:100%;padding:10px;background:#F5C500;color:#111D3D;border:none;
+  border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;}
+
+/* ── TOGGLE ── */
+.track-row{display:flex;align-items:center;gap:12px;}
+.track-info{flex:1;}
+.track-info h3{font-size:14px;font-weight:700;color:var(--blue);}
+.track-info p{font-size:12px;color:var(--sub);margin-top:2px;}
+.toggle-wrap{position:relative;width:52px;height:30px;flex-shrink:0;}
+.toggle-wrap input{opacity:0;width:0;height:0;position:absolute;}
+.toggle-slider{position:absolute;inset:0;background:#CFD8DC;border-radius:30px;cursor:pointer;transition:.25s;}
+.toggle-slider:before{content:'';position:absolute;width:22px;height:22px;left:4px;top:4px;
+  background:#fff;border-radius:50%;transition:.25s;box-shadow:0 1px 4px rgba(0,0,0,.2);}
+input:checked+.toggle-slider{background:var(--yellow);}
+input:checked+.toggle-slider:before{transform:translateX(22px);}
+
+/* ── SECTION KM INICIO/FIM ── */
+.km-section-row{display:flex;gap:8px;margin-bottom:10px;}
+.km-sec-box{flex:1;background:var(--card);border-radius:12px;padding:10px 10px;text-align:center;
+  box-shadow:0 1px 4px rgba(0,0,0,.07);}
+.km-sec-val{font-size:18px;font-weight:800;color:var(--blue);}
+.km-sec-lbl{font-size:9px;color:var(--sub);text-transform:uppercase;letter-spacing:.6px;margin-top:1px;}
+
+/* ── STAT ROW ── */
+.stat-row{display:flex;gap:8px;margin-bottom:10px;}
+.stat-box{flex:1;background:var(--card);border-radius:12px;padding:10px;text-align:center;
+  box-shadow:0 1px 4px rgba(0,0,0,.07);}
+.stat-val{font-size:20px;font-weight:800;color:var(--blue);}
+.stat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase;letter-spacing:.6px;margin-top:2px;}
+
+/* ── BUTTONS ── */
+.btn-row{display:flex;gap:8px;margin-bottom:10px;}
+.btn{flex:1;padding:14px 8px;border:none;border-radius:14px;font-size:13px;font-weight:700;
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:opacity .15s;}
+.btn:active{opacity:.75;}
+.btn span.ico{font-size:22px;}
+.btn-reg{background:var(--yellow);color:var(--blue);}
+.btn-exp-main{background:var(--blue2);color:#fff;}
+.btn-fin{background:#fff;color:var(--blue);border:1.5px solid var(--border);}
+
+/* ── POINTS LIST ── */
+.pts-list{display:flex;flex-direction:column;gap:6px;}
+.pt-item{background:var(--card);border-radius:12px;padding:11px 12px;display:flex;
+  align-items:flex-start;gap:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.pt-num{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;
+  font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.pt-info{flex:1;min-width:0;}
+.pt-desc{font-size:13px;font-weight:700;color:var(--text);}
+.pt-km{font-size:11px;color:var(--sub);margin-top:2px;}
+.pt-coords{font-size:10px;color:#90A4AE;font-family:monospace;margin-top:1px;}
+.pt-dims{font-size:10px;color:#1565C0;margin-top:2px;}
+.pt-del{width:34px;height:34px;border-radius:9px;background:#FFEBEE;border:none;color:var(--red2);
+  font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.empty-pts{text-align:center;padding:24px;color:var(--sub);font-size:13px;line-height:1.6;}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;
+  display:flex;align-items:flex-end;justify-content:center;}
+.modal-overlay.hidden{display:none;}
+.modal{background:var(--card);border-radius:22px 22px 0 0;width:100%;max-width:520px;
+  padding:20px 18px calc(20px + var(--safe-bot));max-height:92dvh;overflow-y:auto;}
+.modal-title{font-size:17px;font-weight:800;color:var(--blue);margin-bottom:16px;
+  display:flex;align-items:center;justify-content:space-between;}
+.modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--sub);}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--sub);
+  text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;}
+.field select,.field input,.field textarea{width:100%;padding:11px 12px;border:1.5px solid var(--border);
+  border-radius:10px;font-size:14px;color:var(--text);background:#fff;outline:none;font-family:inherit;}
+.field select:focus,.field input:focus,.field textarea:focus{border-color:var(--blue2);}
+.field textarea{resize:vertical;min-height:60px;}
+.dims-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.dims-row .field{margin-bottom:0;}
+.btn-full{width:100%;padding:13px;background:var(--yellow);color:var(--blue);border:none;
+  border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;}
+.btn-full.green{background:var(--blue2);color:#fff;}
+.btn-full.gray{background:#ECEFF1;color:var(--blue);}
+
+/* ── EXPORT MODAL BUTTONS ── */
+.exp-btn-list{display:flex;flex-direction:column;gap:8px;}
+.exp-opt{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:14px;
+  cursor:pointer;border:2px solid var(--border);background:#fff;text-align:left;width:100%;}
+.exp-opt:hover,.exp-opt:active{border-color:var(--blue2);background:#EEF4FF;}
+.exp-opt .ico{font-size:28px;flex-shrink:0;}
+.exp-opt .lbl{font-size:15px;font-weight:700;color:var(--blue);}
+.exp-opt .sub{font-size:12px;color:var(--sub);}
+
+/* ── GPS BANNER ── */
+.gps-banner{padding:9px 12px;border-radius:12px;font-size:12px;margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;}
+.gps-banner.warn{background:#FFF3E0;color:#E65100;}
+.gps-banner.ok{background:#E8F5E9;color:#2E7D32;}
+.gps-banner.err{background:#FFEBEE;color:var(--red2);}
+.gps-banner.weak{background:#FFF8E1;color:#F57F17;}
+
+/* ── SETTINGS ── */
+.settings-panel{position:fixed;inset:0;background:var(--bg);z-index:300;overflow-y:auto;
+  padding-top:calc(var(--safe-top)+8px);padding-bottom:calc(var(--safe-bot)+20px);display:none;}
+.settings-panel.open{display:block;}
+.settings-header{display:flex;align-items:center;gap:10px;padding:10px 14px 12px;
+  background:var(--card);border-bottom:1px solid var(--border);margin-bottom:10px;position:sticky;top:0;z-index:10;}
+.settings-header h2{flex:1;font-size:17px;font-weight:700;color:var(--blue);}
+.settings-section{padding:0 10px 10px;}
+.settings-section h3{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;
+  letter-spacing:.7px;padding:8px 0 6px;}
+.type-list{display:flex;flex-direction:column;gap:5px;}
+.type-item{background:var(--card);border-radius:10px;padding:11px 14px;display:flex;
+  align-items:center;gap:8px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.type-item span{flex:1;font-size:14px;color:var(--text);}
+.type-item button.del{background:none;border:none;font-size:18px;cursor:pointer;color:var(--red2);padding:2px 6px;}
+.add-type-row{display:flex;gap:8px;margin-top:8px;}
+.add-type-row input{flex:1;padding:10px 12px;border:1.5px solid var(--border);
+  border-radius:10px;font-size:14px;outline:none;font-family:inherit;}
+.add-type-row input:focus{border-color:var(--blue2);}
+.add-type-row button{padding:10px 14px;background:var(--blue);color:#fff;border:none;
+  border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;
+  border-bottom:1px solid var(--border);}
+.set-row:last-child{border-bottom:none;}
+.set-row label{font-size:13px;color:var(--text);}
+.set-row select{padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;
+  font-size:13px;color:var(--text);outline:none;background:#fff;}
+
+/* ── ABOUT CARD ── */
+.about-card{background:var(--card);border-radius:14px;padding:0;overflow:hidden;
+  box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;}
+.about-top{background:linear-gradient(135deg,#111D3D,#1A2F5E);padding:20px 16px;
+  display:flex;align-items:center;gap:14px;}
+.about-logo{width:56px;height:56px;border-radius:12px;background:#fff;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.about-logo img{width:100%;height:100%;object-fit:contain;}
+.about-logo-fallback{background:#003F87;width:56px;height:56px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex-shrink:0;}
+.about-name{color:#fff;}
+.about-name h4{font-size:15px;font-weight:800;line-height:1.3;}
+.about-name p{font-size:11px;color:rgba(255,255,255,.7);margin-top:2px;}
+.about-body{padding:14px 16px;}
+.about-body p{font-size:12px;color:var(--sub);line-height:1.6;}
+.about-hint{font-size:11px;color:var(--blue2);margin-top:8px;}
+
+/* ── ABOUT FULLSCREEN ── */
+.about-full{position:fixed;inset:0;background:#111D3D;z-index:400;display:none;
+  flex-direction:column;align-items:center;justify-content:center;padding:30px 24px;}
+.about-full.open{display:flex;}
+.about-full-logo{width:120px;height:120px;border-radius:20px;background:#fff;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;margin-bottom:24px;}
+.about-full-logo img{width:100%;height:100%;object-fit:contain;}
+.about-full-name{font-size:26px;font-weight:800;color:#fff;text-align:center;text-transform:uppercase;letter-spacing:1px;}
+.about-full-sub{font-size:14px;color:rgba(255,255,255,.7);text-align:center;margin-top:6px;line-height:1.6;}
+.about-full-ver{font-size:12px;color:rgba(255,255,255,.45);margin-top:16px;}
+.about-full-close{position:absolute;top:calc(var(--safe-top)+12px);right:16px;
+  background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;
+  width:38px;height:38px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+/* ── TABLET LANDSCAPE ── */
+@media (min-width:600px) and (orientation:landscape){
+  body{display:grid;grid-template-columns:1fr 320px;grid-template-rows:auto 1fr;
+    height:100dvh;overflow:hidden;}
+  .header{grid-column:1/-1;grid-row:1;}
+  .main{grid-column:1;grid-row:2;overflow-y:auto;padding:10px 10px 20px;}
+  .tablet-aside{grid-column:2;grid-row:2;overflow-y:auto;background:var(--card);
+    border-left:1px solid var(--border);padding:12px 10px;}
+  .tablet-aside .card-label{font-size:11px;font-weight:700;letter-spacing:.7px;color:var(--sub);
+    text-transform:uppercase;padding:0 0 8px;}
+  /* On tablet, hide the points card in main */
+  .hide-on-tablet{display:none;}
+}
+@media not ((min-width:600px) and (orientation:landscape)){
+  .tablet-aside{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div id="logo-container">
+    <div class="logo-wrap">
+      <img id="logo-img" src="dvabrao-logo.png" onerror="useFallbackLogo()">
+    </div>
+  </div>
+  <div class="header-title">
+    <h1>Odômetro Rodovia Pro</h1>
+    <p>DVAbrao Serviços Ltda</p>
+  </div>
+  <button class="btn-icon" onclick="openSettings()">⚙️</button>
+</div>
+
+<!-- ══ MAIN ══ -->
+<div class="main">
+
+  <!-- GPS Banner -->
+  <div id="gps-banner" class="gps-banner warn">
+    <span>📡</span><span id="gps-banner-txt">Aguardando GPS...</span>
+  </div>
+
+  <!-- ODÔMETRO -->
+  <div class="odo-card">
+    <div class="odo-status-row">
+      <div class="odo-dot" id="odo-dot"></div>
+      <span class="odo-status-txt" id="odo-status">GPS inativo</span>
+      <button class="pill pill-dir" id="pill-dir" onclick="toggleDir()">▲ Crescente</button>
+    </div>
+    <div class="odo-big" onclick="toggleEdit()">
+      <div>
+        <span class="odo-km" id="odo-km">0</span><span class="odo-sep">+</span><span class="odo-m" id="odo-m">000</span>
+      </div>
+      <div class="odo-hint">✎ toque para editar km e sentido</div>
+    </div>
+    <div class="odo-latlon" id="odo-latlon">— aguardando GPS —</div>
+    <!-- Edit panel -->
+    <div class="edit-panel" id="edit-panel">
+      <div class="edit-row">
+        <input class="edit-inp" type="number" id="inp-km" placeholder="0" min="0">
+        <span class="edit-plus">+</span>
+        <input class="edit-inp" type="number" id="inp-m" placeholder="000" min="0" max="999" style="max-width:85px">
+        <span style="color:rgba(255,255,255,.5);font-size:12px;">m</span>
+      </div>
+      <div class="dir-row">
+        <button class="dir-btn sel-c" id="dir-c" onclick="setDir('C')">▲ Crescente</button>
+        <button class="dir-btn" id="dir-d" onclick="setDir('D')">▼ Decrescente</button>
+      </div>
+      <button class="btn-apply" onclick="applyEdit()">✓ Aplicar</button>
+    </div>
+    <!-- Badges -->
+    <div class="odo-sub-row">
+      <div class="odo-badge"><span id="b-dist">0+000</span><small>percorridos</small></div>
+      <div class="odo-badge"><span id="b-spd">0</span><small id="b-spd-unit">km/h</small></div>
+      <div class="odo-badge"><span id="b-pts">0</span><small>pontos</small></div>
+    </div>
+  </div>
+
+  <!-- GRAVAR TRAJETO + KM INÍCIO/FIM -->
+  <div class="card">
+    <div class="track-row">
+      <div class="track-info">
+        <h3>Gravar Trajeto</h3>
+        <p id="track-sub">Desligado — GPS ativo, trajeto não gravado</p>
+      </div>
+      <label class="toggle-wrap">
+        <input type="checkbox" id="track-toggle" onchange="onTrackToggle()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- KM INÍCIO / FIM DO TRECHO -->
+  <div class="km-section-row">
+    <div class="km-sec-box">
+      <div class="km-sec-val" id="sec-ini">—</div>
+      <div class="km-sec-lbl">Início do Trecho</div>
+    </div>
+    <div class="km-sec-box">
+      <div class="km-sec-val" id="sec-fim">—</div>
+      <div class="km-sec-lbl">Fim do Trecho</div>
+    </div>
+    <div class="km-sec-box">
+      <div class="km-sec-val" id="sec-ext">—</div>
+      <div class="km-sec-lbl">Extensão</div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stat-row">
+    <div class="stat-box"><div class="stat-val" id="stat-ini">0+000</div><div class="stat-lbl">KM Inicial</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-pts">0</div><div class="stat-lbl">Pontos</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-track">0</div><div class="stat-lbl">Coords GPS</div></div>
+  </div>
+
+  <!-- BOTÕES -->
+  <div class="btn-row">
+    <button class="btn btn-reg" onclick="openAddPoint()">
+      <span class="ico">📍</span>Registrar Ponto
+    </button>
+    <button class="btn btn-exp-main" onclick="openExport()">
+      <span class="ico">📤</span>Exportar
+    </button>
+    <button class="btn btn-fin" onclick="confirmFinish()">
+      <span class="ico">🏁</span>Finalizar
+    </button>
+  </div>
+
+  <!-- PONTOS (escondido no tablet — aparece no aside) -->
+  <div class="card hide-on-tablet">
+    <div class="card-label">Pontos registrados</div>
+    <div class="pts-list" id="pts-list">
+      <div class="empty-pts">Nenhum ponto registrado.<br>Toque em "Registrar Ponto" para adicionar.</div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ══ TABLET ASIDE — pontos ══ -->
+<div class="tablet-aside">
+  <div class="card-label">Pontos registrados</div>
+  <div class="pts-list" id="pts-list-tablet">
+    <div class="empty-pts">Nenhum ponto.</div>
+  </div>
+</div>
+
+<!-- ══ MODAL ADICIONAR PONTO ══ -->
+<div class="modal-overlay hidden" id="modal-pt">
+  <div class="modal">
+    <div class="modal-title">📍 Registrar Ponto<button class="modal-close" onclick="closeModal('modal-pt')">✕</button></div>
+    <div class="field">
+      <label>Tipo / Descrição</label>
+      <select id="pt-type"></select>
+    </div>
+    <div class="field">
+      <label>Observação livre</label>
+      <textarea id="pt-obs" rows="2" placeholder="Detalhes adicionais..."></textarea>
+    </div>
+    <div class="field">
+      <label>Dimensões (opcional)</label>
+      <div class="dims-row">
+        <div class="field"><label>Largura (m)</label><input type="number" id="pt-w" placeholder="0.00" step="0.01" min="0"></div>
+        <div class="field"><label>Comprimento (m)</label><input type="number" id="pt-l" placeholder="0.00" step="0.01" min="0"></div>
+        <div class="field"><label>Espessura (cm)</label><input type="number" id="pt-h" placeholder="0" step="0.5" min="0"></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Posição (KM) / Coordenadas</label>
+      <input type="text" id="pt-km-val" readonly style="background:#f5f5f5;color:var(--sub);font-family:monospace;font-size:12px;">
+    </div>
+    <button class="btn-full" onclick="savePoint()">✓ Salvar Ponto</button>
+  </div>
+</div>
+
+<!-- ══ MODAL EXPORTAR ══ -->
+<div class="modal-overlay hidden" id="modal-exp">
+  <div class="modal">
+    <div class="modal-title">📤 Exportar Levantamento<button class="modal-close" onclick="closeModal('modal-exp')">✕</button></div>
+    <div class="exp-btn-list">
+      <button class="exp-opt" onclick="exportKML();closeModal('modal-exp')">
+        <span class="ico">🗺️</span>
+        <div><div class="lbl">KML</div><div class="sub">Rota + pontos para Google Earth / Maps</div></div>
+      </button>
+      <button class="exp-opt" onclick="exportKMZ();closeModal('modal-exp')">
+        <span class="ico">📦</span>
+        <div><div class="lbl">KMZ</div><div class="sub">KML compactado (.kmz)</div></div>
+      </button>
+      <button class="exp-opt" onclick="exportPDF();closeModal('modal-exp')">
+        <span class="ico">📄</span>
+        <div><div class="lbl">PDF — Relatório de Pontos</div><div class="sub">Descrição, coordenadas e dimensões de cada ponto</div></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL FINALIZAR ══ -->
+<div class="modal-overlay hidden" id="modal-fin">
+  <div class="modal">
+    <div class="modal-title">🏁 Finalizar Levantamento<button class="modal-close" onclick="closeModal('modal-fin')">✕</button></div>
+    <p style="font-size:13px;color:var(--sub);margin-bottom:14px;">Salve os dados antes de zerar.</p>
+    <button class="btn-full green" onclick="exportKML();closeModal('modal-fin')">🗺️ Salvar KML</button>
+    <button class="btn-full" style="margin-top:8px;background:#E3F2FD;color:var(--blue2);" onclick="exportKMZ();closeModal('modal-fin')">📦 Salvar KMZ</button>
+    <button class="btn-full" style="margin-top:8px;background:#FFF3E0;color:#E65100;" onclick="exportPDF();closeModal('modal-fin')">📄 Relatório PDF</button>
+    <button class="btn-full" style="margin-top:8px;background:#FFEBEE;color:var(--red2);" onclick="clearSession();closeModal('modal-fin')">🗑️ Descartar e zerar</button>
+  </div>
+</div>
+
+<!-- ══ CONFIRM DELETE POINT ══ -->
+<div class="modal-overlay hidden" id="modal-del">
+  <div class="modal" style="padding:22px 18px calc(22px + var(--safe-bot));">
+    <div class="modal-title" style="font-size:16px;">Remover ponto?<button class="modal-close" onclick="closeModal('modal-del')">✕</button></div>
+    <p id="del-desc" style="font-size:13px;color:var(--sub);margin-bottom:16px;"></p>
+    <button class="btn-full" style="background:#FFEBEE;color:var(--red2);" onclick="confirmDelPoint()">🗑️ Remover</button>
+    <button class="btn-full gray" style="margin-top:8px;" onclick="closeModal('modal-del')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ══ SETTINGS ══ -->
+<div class="settings-panel" id="settings-panel">
+  <div class="settings-header">
+    <button class="btn-icon" onclick="closeSettings()">←</button>
+    <h2>Configurações</h2>
+  </div>
+
+  <div class="settings-section">
+    <h3>Tipos de Ponto</h3>
+    <p style="font-size:12px;color:var(--sub);margin-bottom:8px;">Personalize a lista de descrições usadas ao registrar pontos.</p>
+    <div class="type-list" id="type-list"></div>
+    <div class="add-type-row">
+      <input type="text" id="new-type-inp" placeholder="Novo tipo de ponto...">
+      <button onclick="addType()">+ Adicionar</button>
+    </div>
+  </div>
+
+  <div class="settings-section" style="margin-top:4px;">
+    <h3>Unidades</h3>
+    <div class="card" style="padding:4px 14px;">
+      <div class="set-row">
+        <label>Velocidade</label>
+        <select id="set-spd" onchange="saveSettings()">
+          <option value="kmh">km/h</option>
+          <option value="ms">m/s</option>
+          <option value="mph">mph</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <label>Formato das coordenadas</label>
+        <select id="set-coord" onchange="saveSettings()">
+          <option value="dd">Graus decimais (DD)</option>
+          <option value="ddm">Graus e minutos (DDM)</option>
+          <option value="dms">Graus, min., seg. (DMS)</option>
+          <option value="utm">UTM (simplificado)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section" style="margin-top:4px;">
+    <h3>Sobre</h3>
+    <div class="about-card" onclick="openAboutFull()">
+      <div class="about-top">
+        <div id="about-logo-wrap">
+          <div class="about-logo"><img src="dvabrao-logo.png" onerror="this.parentElement.innerHTML='DVA'" style="width:100%;height:100%;object-fit:contain;"></div>
+        </div>
+        <div class="about-name">
+          <h4>DVABRAO SERVIÇOS LTDA</h4>
+          <p>Odômetro Rodovia Pro · Versão 2.0</p>
+        </div>
+      </div>
+      <div class="about-body">
+        <p>App de levantamento de patologias rodoviárias com GPS e exportação KML/PDF.</p>
+        <p class="about-hint">Toque para ver informações completas →</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ABOUT FULLSCREEN ══ -->
+<div class="about-full" id="about-full">
+  <button class="about-full-close" onclick="closeAboutFull()">✕</button>
+  <div class="about-full-logo">
+    <img src="dvabrao-logo.png" onerror="this.parentElement.innerHTML='<span style=\'font-size:32px;font-weight:800;color:#003F87\'>DVA</span>'" style="width:100%;height:100%;object-fit:contain;">
+  </div>
+  <div class="about-full-name">DVAbrao Serviços Ltda</div>
+  <div class="about-full-sub">
+    Engenharia &amp; Infraestrutura<br>
+    Odômetro Rodovia Pro<br><br>
+    Levantamento de campo com GPS,<br>registro de patologias e exportação KML/PDF
+  </div>
+  <div class="about-full-ver">Versão 2.0 · dvabrao.com.br</div>
+</div>
+
+<script>
+// ════════════════════════════════
+//  ESTADO
+// ════════════════════════════════
+let dir='C', kmIni=0, curKm=0, distTotal=0;
+let tracking=false;
+let secIni=null, secFim=null; // km início/fim do trecho gravado
+let lastLat=null, lastLon=null, lastTime=null;
+let curLat=null, curLon=null, curAcc=0, curSpd=0;
+let watchId=null;
+let trackPoints=[], points=[], pointTypes=[];
+let settings={spd:'kmh', coord:'dd'};
+const ACC_MAX=40, SPD_MAX=150;
+let pendingDelIdx=null;
+
+// ════════════════════════════════
+//  PERSISTÊNCIA
+// ════════════════════════════════
+function save(){
+  try{localStorage.setItem('odo_v2',JSON.stringify(
+    {dir,kmIni,curKm,distTotal,trackPoints,points,pointTypes,
+     secIni,secFim,settings}));}catch(e){}
+}
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem('odo_v2')||'{}');
+    if(d.dir) dir=d.dir;
+    if(d.kmIni!=null) kmIni=d.kmIni;
+    if(d.curKm!=null) curKm=d.curKm;
+    if(d.distTotal!=null) distTotal=d.distTotal;
+    if(d.trackPoints) trackPoints=d.trackPoints;
+    if(d.points) points=d.points;
+    if(d.pointTypes&&d.pointTypes.length) pointTypes=d.pointTypes;
+    else pointTypes=defaultTypes();
+    if(d.secIni!=null) secIni=d.secIni;
+    if(d.secFim!=null) secFim=d.secFim;
+    if(d.settings) settings=Object.assign(settings,d.settings);
+  }catch(e){pointTypes=defaultTypes();}
+}
+function defaultTypes(){
+  return['Trinca longitudinal','Trinca transversal','Trinca em malha (couro de jacaré)',
+  'Afundamento','Ondulação (corrugação)','Panela / Buraco','Desgaste superficial',
+  'Remendo','Exsudação','Desnível entre faixas','Acostamento danificado','Sinalização ausente',
+  'Drenagem comprometida','Obstáculo na pista','Outro'];
+}
+function saveSettings(){
+  settings.spd=document.getElementById('set-spd').value;
+  settings.coord=document.getElementById('set-coord').value;
+  save();updateOdo();
+}
+
+// ════════════════════════════════
+//  FORMATAÇÃO
+// ════════════════════════════════
+function fmtKmM(km){
+  const k=Math.floor(Math.abs(km));
+  const m=String(Math.round((Math.abs(km)-k)*1000)).padStart(3,'0');
+  return{km:String(k),m};
+}
+function fmtFull(km){
+  if(km==null) return '—';
+  const{km:k,m}=fmtKmM(km);return k+'+'+m;
+}
+function fmtSpd(kmh){
+  if(settings.spd==='ms') return (kmh/3.6).toFixed(1);
+  if(settings.spd==='mph') return (kmh*0.621371).toFixed(1);
+  return Math.round(kmh).toString();
+}
+function spdUnit(){
+  if(settings.spd==='ms') return 'm/s';
+  if(settings.spd==='mph') return 'mph';
+  return 'km/h';
+}
+function fmtCoord(lat,lon){
+  if(settings.coord==='dd')
+    return lat.toFixed(6)+'°, '+lon.toFixed(6)+'°';
+  if(settings.coord==='ddm')
+    return toDDM(lat,'NS')+', '+toDDM(lon,'EW');
+  if(settings.coord==='dms')
+    return toDMS(lat,'NS')+', '+toDMS(lon,'EW');
+  if(settings.coord==='utm')
+    return toUTM(lat,lon);
+  return lat.toFixed(6)+'°, '+lon.toFixed(6)+'°';
+}
+function toDDM(val,dirs){
+  const d=Math.trunc(Math.abs(val));
+  const m=(Math.abs(val)-d)*60;
+  const h=val>=0?dirs[0]:dirs[1];
+  return d+'°'+m.toFixed(4)+"' "+h;
+}
+function toDMS(val,dirs){
+  const d=Math.trunc(Math.abs(val));
+  const mFull=(Math.abs(val)-d)*60;
+  const m=Math.trunc(mFull);
+  const s=((mFull-m)*60).toFixed(1);
+  const h=val>=0?dirs[0]:dirs[1];
+  return d+'°'+m+"'"+s+'" '+h;
+}
+function toUTM(lat,lon){
+  // Aproximação simples para exibição
+  const zone=Math.floor((lon+180)/6)+1;
+  const hemi=lat>=0?'N':'S';
+  // Fator de escala simplificado
+  const a=6378137,e2=0.00669438;
+  const phi=lat*Math.PI/180, lam=lon*Math.PI/180;
+  const lam0=((zone-1)*6-180+3)*Math.PI/180;
+  const N0=lat<0?10000000:0;
+  const n=a/Math.sqrt(1-e2*Math.sin(phi)**2);
+  const T=Math.tan(phi)**2, C=e2/(1-e2)*Math.cos(phi)**2;
+  const A=(lam-lam0)*Math.cos(phi);
+  const E=500000+0.9996*n*(A+(1-T+C)*A**3/6);
+  const M=a*((1-e2/4-3*e2**2/64)*phi-(3*e2/8+3*e2**2/32)*Math.sin(2*phi)+(15*e2**2/256)*Math.sin(4*phi));
+  const N2=N0+0.9996*(M+n*Math.tan(phi)*((A**2/2)+(5-T+9*C)*A**4/24));
+  return zone+hemi+' E:'+Math.round(E)+' N:'+Math.round(N2);
+}
+
+// ════════════════════════════════
+//  ATUALIZAR UI
+// ════════════════════════════════
+function updateOdo(){
+  const{km:k,m}=fmtKmM(curKm);
+  document.getElementById('odo-km').textContent=k;
+  document.getElementById('odo-m').textContent=m;
+  document.getElementById('b-dist').textContent=fmtFull(distTotal);
+  document.getElementById('b-spd').textContent=fmtSpd(curSpd);
+  document.getElementById('b-spd-unit').textContent=spdUnit();
+  document.getElementById('b-pts').textContent=points.length;
+  document.getElementById('stat-ini').textContent=fmtFull(kmIni);
+  document.getElementById('stat-pts').textContent=points.length;
+  document.getElementById('stat-track').textContent=trackPoints.length;
+  // lat/lon
+  if(curLat!==null){
+    document.getElementById('odo-latlon').textContent=fmtCoord(curLat,curLon);
+  }
+  // dir pill
+  const p=document.getElementById('pill-dir');
+  if(dir==='C'){p.textContent='▲ Crescente';p.className='pill pill-dir cresc';}
+  else{p.textContent='▼ Decrescente';p.className='pill pill-dir decresc';}
+  // seção início/fim
+  document.getElementById('sec-ini').textContent=secIni!=null?fmtFull(secIni):'—';
+  document.getElementById('sec-fim').textContent=secFim!=null?fmtFull(secFim):'—';
+  if(secIni!=null&&secFim!=null){
+    document.getElementById('sec-ext').textContent=fmtFull(Math.abs(secFim-secIni));
+  } else {
+    document.getElementById('sec-ext').textContent='—';
+  }
+}
+function updateTrackUI(){
+  const dot=document.getElementById('odo-dot');
+  const sub=document.getElementById('track-sub');
+  const st=document.getElementById('odo-status');
+  if(tracking){
+    dot.className='odo-dot on';
+    sub.textContent='Ligado — gravando trajeto';
+    st.textContent='Gravando trajeto';
+  }else{
+    dot.className='odo-dot on';
+    sub.textContent='Desligado — GPS ativo, trajeto não gravado';
+    st.textContent='GPS ativo';
+  }
+}
+function renderPoints(){
+  const render=(el,empty)=>{
+    if(!el) return;
+    if(!points.length){
+      el.innerHTML=`<div class="empty-pts">${empty}</div>`;
+      return;
+    }
+    el.innerHTML=points.map((p,i)=>{
+      const dims=[];
+      if(p.w) dims.push('L:'+p.w+'m');
+      if(p.l) dims.push('C:'+p.l+'m');
+      if(p.h) dims.push('E:'+p.h+'cm');
+      const coordStr=p.lat?fmtCoord(p.lat,p.lon):'—';
+      return`<div class="pt-item">
+        <div class="pt-num">${i+1}</div>
+        <div class="pt-info">
+          <div class="pt-desc">${p.type}</div>
+          <div class="pt-km">${fmtFull(p.km)}${p.obs?' · '+p.obs:''}</div>
+          <div class="pt-coords">${coordStr}</div>
+          ${dims.length?`<div class="pt-dims">📏 ${dims.join(' ')}</div>`:''}
+        </div>
+        <button class="pt-del" data-idx="${i}" onclick="askDelPoint(${i})">🗑</button>
+      </div>`;
+    }).join('');
+  };
+  render(document.getElementById('pts-list'),
+    'Nenhum ponto registrado.<br>Toque em "Registrar Ponto" para adicionar.');
+  render(document.getElementById('pts-list-tablet'),'Nenhum ponto.');
+}
+function renderTypes(){
+  const el=document.getElementById('type-list');
+  if(!el) return;
+  el.innerHTML=pointTypes.map((t,i)=>`
+    <div class="type-item">
+      <span>${t}</span>
+      <button class="del" onclick="delType(${i})">✕</button>
+    </div>`).join('');
+}
+
+// ════════════════════════════════
+//  GPS
+// ════════════════════════════════
+function isNativeApp(){
+  return typeof window.NativeGPS!=='undefined'&&window.NativeGPS.isNative&&window.NativeGPS.isNative()==='true';
+}
+window._nativeGpsPosition=function(lat,lon,acc,speedMs){
+  onPosition({coords:{latitude:lat,longitude:lon,accuracy:acc,speed:speedMs}});
+};
+function startGps(){
+  if(isNativeApp()){window.NativeGPS.start&&window.NativeGPS.start();updateBanner('ok','GPS nativo ativo');return;}
+  if(!navigator.geolocation){updateBanner('err','GPS não disponível');return;}
+  watchId=navigator.geolocation.watchPosition(
+    pos=>onPosition(pos),
+    err=>{
+      if(err.code===1) updateBanner('err','Permissão negada. Libere a localização nas configurações.');
+      else updateBanner('warn','Aguardando sinal GPS...');
+    },
+    {enableHighAccuracy:true,timeout:20000,maximumAge:2000}
+  );
+  updateBanner('ok','Aguardando primeira posição...');
+}
+function updateBanner(state,txt){
+  const b=document.getElementById('gps-banner');
+  b.className='gps-banner '+state;
+  document.getElementById('gps-banner-txt').textContent=txt;
+  const dot=document.getElementById('odo-dot');
+  if(state==='ok') dot.className='odo-dot on';
+  else if(state==='weak') dot.className='odo-dot weak';
+  else dot.className='odo-dot';
+}
+function onPosition(pos){
+  const lat=pos.coords.latitude, lon=pos.coords.longitude;
+  const acc=Math.abs(pos.coords.accuracy||999);
+  const now=Date.now();
+  curLat=lat; curLon=lon; curAcc=acc;
+  updateOdo();
+  if(acc>ACC_MAX){
+    updateBanner('weak','⚠️ GPS fraco · Precisão: '+Math.round(acc)+'m');
+    return;
+  }
+  updateBanner('ok','GPS ativo · Precisão: '+Math.round(acc)+'m');
+  if(lastLat!==null&&lastTime!==null){
+    const d=haversine(lastLat,lastLon,lat,lon);
+    const dt=(now-lastTime)/3600000;
+    const spd=dt>0?d/dt:0;
+    if(spd>SPD_MAX){lastLat=lat;lastLon=lon;lastTime=now;return;}
+    if(d>0.003){
+      distTotal+=d;
+      curKm=dir==='C'?kmIni+distTotal:kmIni-distTotal;
+      curSpd=spd;
+      if(tracking){
+        trackPoints.push({lat,lon,km:curKm});
+        secFim=curKm; // atualiza fim do trecho continuamente
+      }
+      updateOdo();save();
+    }
+  }else{
+    if(tracking) trackPoints.push({lat,lon,km:curKm});
+  }
+  lastLat=lat;lastLon=lon;lastTime=now;
+}
+function haversine(la1,lo1,la2,lo2){
+  const R=6371,r=Math.PI/180;
+  const dLa=(la2-la1)*r,dLo=(lo2-lo1)*r;
+  const a=Math.sin(dLa/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dLo/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ════════════════════════════════
+//  CONTROLES
+// ════════════════════════════════
+function onTrackToggle(){
+  tracking=document.getElementById('track-toggle').checked;
+  if(tracking){
+    lastLat=null;lastLon=null;lastTime=null;
+    secIni=curKm; secFim=curKm; // registra início do trecho
+  } else {
+    secFim=curKm; // registra fim do trecho
+  }
+  updateTrackUI();updateOdo();save();
+}
+function toggleDir(){
+  dir=dir==='C'?'D':'C';
+  curKm=dir==='C'?kmIni+distTotal:kmIni-distTotal;
+  updateOdo();save();
+}
+let editOpen=false;
+function toggleEdit(){
+  editOpen=!editOpen;
+  document.getElementById('edit-panel').style.display=editOpen?'block':'none';
+  if(editOpen){
+    const{km:k,m}=fmtKmM(curKm);
+    document.getElementById('inp-km').value=k;
+    document.getElementById('inp-m').value=m;
+    _updDirBtns();
+    setTimeout(()=>{
+      document.getElementById('inp-km').focus();
+      document.getElementById('inp-km').select();
+    },100);
+  }
+}
+function setDir(d){dir=d;_updDirBtns();}
+function _updDirBtns(){
+  document.getElementById('dir-c').className='dir-btn'+(dir==='C'?' sel-c':'');
+  document.getElementById('dir-d').className='dir-btn'+(dir==='D'?' sel-d':'');
+}
+function applyEdit(){
+  const k=parseInt(document.getElementById('inp-km').value)||0;
+  const m=parseInt(document.getElementById('inp-m').value)||0;
+  kmIni=k+Math.min(m,999)/1000;
+  curKm=kmIni;distTotal=0;lastLat=null;lastLon=null;lastTime=null;
+  secIni=null;secFim=null;
+  editOpen=false;
+  document.getElementById('edit-panel').style.display='none';
+  updateOdo();save();
+}
+
+// ════════════════════════════════
+//  PONTOS
+// ════════════════════════════════
+function openAddPoint(){
+  const sel=document.getElementById('pt-type');
+  sel.innerHTML=pointTypes.map(t=>`<option>${t}</option>`).join('');
+  document.getElementById('pt-obs').value='';
+  document.getElementById('pt-w').value='';
+  document.getElementById('pt-l').value='';
+  document.getElementById('pt-h').value='';
+  const coordStr=curLat?fmtFull(curKm)+' · '+fmtCoord(curLat,curLon):fmtFull(curKm);
+  document.getElementById('pt-km-val').value=coordStr;
+  openModal('modal-pt');
+}
+function savePoint(){
+  points.push({
+    type:document.getElementById('pt-type').value,
+    obs:document.getElementById('pt-obs').value.trim(),
+    w:document.getElementById('pt-w').value||null,
+    l:document.getElementById('pt-l').value||null,
+    h:document.getElementById('pt-h').value||null,
+    km:curKm,lat:curLat,lon:curLon
+  });
+  closeModal('modal-pt');
+  renderPoints();updateOdo();save();
+}
+function askDelPoint(i){
+  pendingDelIdx=i;
+  const p=points[i];
+  document.getElementById('del-desc').textContent=
+    'Ponto '+(i+1)+': '+p.type+' · '+fmtFull(p.km);
+  openModal('modal-del');
+}
+function confirmDelPoint(){
+  if(pendingDelIdx==null) return;
+  points.splice(pendingDelIdx,1);
+  pendingDelIdx=null;
+  closeModal('modal-del');
+  renderPoints();updateOdo();save();
+}
+function delType(i){
+  pointTypes.splice(i,1);renderTypes();save();
+}
+function addType(){
+  const inp=document.getElementById('new-type-inp');
+  const v=inp.value.trim();if(!v)return;
+  pointTypes.push(v);inp.value='';renderTypes();save();
+}
+
+// ════════════════════════════════
+//  MODAIS
+// ════════════════════════════════
+function openModal(id){document.getElementById(id).classList.remove('hidden');}
+function closeModal(id){document.getElementById(id).classList.add('hidden');}
+function openSettings(){
+  document.getElementById('settings-panel').classList.add('open');
+  document.getElementById('set-spd').value=settings.spd;
+  document.getElementById('set-coord').value=settings.coord;
+  renderTypes();
+}
+function closeSettings(){document.getElementById('settings-panel').classList.remove('open');}
+function openExport(){openModal('modal-exp');}
+function confirmFinish(){openModal('modal-fin');}
+function openAboutFull(){document.getElementById('about-full').classList.add('open');}
+function closeAboutFull(){document.getElementById('about-full').classList.remove('open');}
+function clearSession(){
+  kmIni=0;curKm=0;distTotal=0;lastLat=null;lastLon=null;lastTime=null;
+  trackPoints=[];points=[];secIni=null;secFim=null;curSpd=0;
+  document.getElementById('track-toggle').checked=false;
+  tracking=false;
+  updateTrackUI();updateOdo();renderPoints();save();
+}
+
+// ════════════════════════════════
+//  EXPORT
+// ════════════════════════════════
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function buildKML(){
+  let kml=`<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+  <name>Odômetro Rodovia Pro</name>
+  <description>Levantamento DVAbrao — ${new Date().toLocaleString('pt-BR')}</description>
+  <Style id="track"><LineStyle><color>ff0000ff</color><width>3</width></LineStyle></Style>
+  <Style id="pt"><IconStyle><Icon><href>http://maps.google.com/mapfiles/ms/icons/red-dot.png</href></Icon></IconStyle></Style>\n`;
+  if(trackPoints.length>1){
+    kml+=`  <Placemark><name>Rota ${fmtFull(secIni||kmIni)} → ${fmtFull(secFim||curKm)}</name>
+    <styleUrl>#track</styleUrl><LineString><tessellate>1</tessellate><coordinates>\n`;
+    kml+=trackPoints.map(p=>`    ${p.lon},${p.lat},0`).join('\n');
+    kml+=`\n  </coordinates></LineString></Placemark>\n`;
+  }
+  points.forEach((p,i)=>{
+    if(!p.lat) return;
+    const dims=[p.w?'Largura: '+p.w+' m':'',p.l?'Comprimento: '+p.l+' m':'',p.h?'Espessura: '+p.h+' cm':''].filter(Boolean).join(', ');
+    kml+=`  <Placemark>
+    <name>${esc(p.type)} · ${fmtFull(p.km)}</name>
+    <description>${esc(p.obs)}${dims?'\n'+esc(dims):''}</description>
+    <styleUrl>#pt</styleUrl>
+    <Point><coordinates>${p.lon},${p.lat},0</coordinates></Point>
+  </Placemark>\n`;
+  });
+  return kml+`</Document></kml>`;
+}
+function exportKML(){
+  dl(new Blob([buildKML()],{type:'application/vnd.google-earth.kml+xml'}),
+    'OdometroRodovia_'+dateSuffix()+'.kml');
+}
+async function exportKMZ(){
+  try{
+    const zip=new window.JSZip();
+    zip.file('doc.kml',buildKML());
+    dl(await zip.generateAsync({type:'blob',compression:'DEFLATE'}),
+      'OdometroRodovia_'+dateSuffix()+'.kmz');
+  }catch(e){exportKML();}
+}
+function exportPDF(){
+  if(!points.length){
+    alert('Nenhum ponto registrado para gerar relatório.');return;
+  }
+  const dt=new Date().toLocaleString('pt-BR');
+  const rows=points.map((p,i)=>{
+    const dims=[p.w?'L: '+p.w+' m':'',p.l?'C: '+p.l+' m':'',p.h?'E: '+p.h+' cm':''].filter(Boolean).join('<br>');
+    const coord=p.lat?p.lat.toFixed(6)+'<br>'+p.lon.toFixed(6):'—';
+    return`<tr>
+      <td>${i+1}</td>
+      <td><strong>${esc(p.type)}</strong>${p.obs?'<br><span class="obs">'+esc(p.obs)+'</span>':''}</td>
+      <td>${fmtFull(p.km)}</td>
+      <td class="mono">${coord}</td>
+      <td>${dims||'—'}</td>
+    </tr>`;
+  }).join('');
+  const secInfo=secIni!=null?`KM Início: ${fmtFull(secIni)} &nbsp;|&nbsp; KM Fim: ${fmtFull(secFim)} &nbsp;|&nbsp; Extensão: ${fmtFull(Math.abs((secFim||0)-(secIni||0)))}`:'';
+  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>Relatório — Odômetro Rodovia Pro</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:18px;}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
+.logo-box{width:48px;height:48px;background:#003F87;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;}
+h1{font-size:15px;color:#003F87;}
+.sub{font-size:10px;color:#555;margin-bottom:4px;}
+.sec{font-size:10px;color:#003F87;font-weight:600;margin-bottom:12px;}
+table{width:100%;border-collapse:collapse;}
+th{background:#003F87;color:#fff;padding:6px 7px;text-align:left;font-size:9px;text-transform:uppercase;}
+td{padding:6px 7px;border-bottom:1px solid #e0e0e0;vertical-align:top;}
+tr:nth-child(even) td{background:#f5f8ff;}
+.obs{color:#555;font-style:italic;}
+.mono{font-family:monospace;font-size:9px;}
+.foot{margin-top:12px;font-size:10px;color:#888;text-align:right;}
+@media print{body{padding:0;}}
+</style></head><body>
+<div class="top"><div class="logo-box">DVA</div>
+<div><h1>Relatório de Pontos — Odômetro Rodovia Pro</h1>
+<div class="sub">DVABRAO SERVIÇOS LTDA &nbsp;·&nbsp; Gerado em: ${dt}</div></div></div>
+<div class="sec">KM Inicial: ${fmtFull(kmIni)} &nbsp;|&nbsp; Sentido: ${dir==='C'?'Crescente':'Decrescente'}${secInfo?' &nbsp;|&nbsp; '+secInfo:''}</div>
+<table><thead><tr><th>#</th><th>Tipo / Descrição</th><th>KM</th><th>Coordenadas</th><th>Dimensões</th></tr></thead>
+<tbody>${rows}</tbody></table>
+<div class="foot">Total: ${points.length} ponto(s)</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+  const w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
+  else alert('Permita pop-ups para gerar o PDF.');
+}
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();}
+function dateSuffix(){return new Date().toISOString().slice(0,10).replace(/-/g,'');}
+
+// ════════════════════════════════
+//  LOGO FALLBACK
+// ════════════════════════════════
+function useFallbackLogo(){
+  document.getElementById('logo-container').innerHTML=
+    '<div class="logo-fallback">DVA</div>';
+}
+
+// ════════════════════════════════
+//  INIT
+// ════════════════════════════════
+load();
+updateOdo();
+updateTrackUI();
+renderPoints();
+startGps();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</body>
+</html>

@@ -6,9 +6,10 @@
 <title>Odômetro Rodovia Pro</title>
 <style>
 :root{
-  --blue:#003F87;--blue2:#1565C0;--green:#1B5E20;--green2:#2E7D32;
+  --blue:#111D3D;--blue2:#1A2F5E;--green:#1B5E20;--green2:#2E7D32;
+  --yellow:#F5C500;--yellow2:#FFD740;
   --red:#B71C1C;--red2:#C62828;--orange:#E65100;--gray:#607D8B;
-  --bg:#F0F4F8;--card:#FFFFFF;--text:#1A237E;--sub:#546E7A;--border:#CFD8DC;
+  --bg:#F0F4F8;--card:#FFFFFF;--text:#111D3D;--sub:#546E7A;--border:#CFD8DC;
   --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
@@ -39,16 +40,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   text-transform:uppercase;margin-bottom:8px;}
 
 /* ── ODOMETER ── */
-.odo-card{background:linear-gradient(135deg,#003F87 0%,#1565C0 100%);border-radius:18px;
-  padding:16px 14px 14px;margin-bottom:10px;box-shadow:0 4px 16px rgba(0,63,135,.3);}
+.odo-card{background:linear-gradient(135deg,#111D3D 0%,#1A2F5E 100%);border-radius:18px;
+  padding:16px 14px 14px;margin-bottom:10px;box-shadow:0 4px 16px rgba(17,29,61,.35);}
 .odo-status-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
 .odo-dot{width:8px;height:8px;border-radius:50%;background:#9E9E9E;flex-shrink:0;transition:.3s;}
-.odo-dot.on{background:#69F0AE;box-shadow:0 0 6px #69F0AE;}
+.odo-dot.on{background:#F5C500;box-shadow:0 0 6px #F5C500;}
 .odo-dot.weak{background:#FFD54F;}
 .odo-status-txt{font-size:11px;color:rgba(255,255,255,.75);flex:1;}
 .pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:none;}
 .pill-dir{background:rgba(255,255,255,.15);color:#fff;}
-.pill-dir.cresc{background:rgba(105,240,174,.2);color:#69F0AE;}
+.pill-dir.cresc{background:rgba(245,197,0,.25);color:#F5C500;}
 .pill-dir.decresc{background:rgba(255,138,128,.2);color:#FF8A80;}
 .odo-big{text-align:center;cursor:pointer;user-select:none;padding:2px 0;}
 .odo-km{font-size:60px;font-weight:800;color:#fff;line-height:1;letter-spacing:-2px;}
@@ -73,7 +74,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
   border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);}
 .dir-btn.sel-c{background:rgba(105,240,174,.25);color:#69F0AE;border-color:#69F0AE;}
 .dir-btn.sel-d{background:rgba(255,138,128,.25);color:#FF8A80;border-color:#FF8A80;}
-.btn-apply{width:100%;padding:10px;background:#69F0AE;color:#003F87;border:none;
+.btn-apply{width:100%;padding:10px;background:#F5C500;color:#111D3D;border:none;
   border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;}
 
 /* ── TOGGLE ── */
@@ -86,7 +87,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .toggle-slider{position:absolute;inset:0;background:#CFD8DC;border-radius:30px;cursor:pointer;transition:.25s;}
 .toggle-slider:before{content:'';position:absolute;width:22px;height:22px;left:4px;top:4px;
   background:#fff;border-radius:50%;transition:.25s;box-shadow:0 1px 4px rgba(0,0,0,.2);}
-input:checked+.toggle-slider{background:var(--green2);}
+input:checked+.toggle-slider{background:var(--yellow);}
 input:checked+.toggle-slider:before{transform:translateX(22px);}
 
 /* ── SECTION KM INICIO/FIM ── */
@@ -109,8 +110,8 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:opacity .15s;}
 .btn:active{opacity:.75;}
 .btn span.ico{font-size:22px;}
-.btn-reg{background:var(--blue);color:#fff;}
-.btn-exp-main{background:var(--green2);color:#fff;}
+.btn-reg{background:var(--yellow);color:var(--blue);}
+.btn-exp-main{background:var(--blue2);color:#fff;}
 .btn-fin{background:#fff;color:var(--blue);border:1.5px solid var(--border);}
 
 /* ── POINTS LIST ── */
@@ -146,9 +147,9 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
 .field textarea{resize:vertical;min-height:60px;}
 .dims-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
 .dims-row .field{margin-bottom:0;}
-.btn-full{width:100%;padding:13px;background:var(--blue);color:#fff;border:none;
+.btn-full{width:100%;padding:13px;background:var(--yellow);color:var(--blue);border:none;
   border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;}
-.btn-full.green{background:var(--green2);}
+.btn-full.green{background:var(--blue2);color:#fff;}
 .btn-full.gray{background:#ECEFF1;color:var(--blue);}
 
 /* ── EXPORT MODAL BUTTONS ── */
@@ -199,7 +200,7 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
 /* ── ABOUT CARD ── */
 .about-card{background:var(--card);border-radius:14px;padding:0;overflow:hidden;
   box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;}
-.about-top{background:linear-gradient(135deg,#003F87,#1565C0);padding:20px 16px;
+.about-top{background:linear-gradient(135deg,#111D3D,#1A2F5E);padding:20px 16px;
   display:flex;align-items:center;gap:14px;}
 .about-logo{width:56px;height:56px;border-radius:12px;background:#fff;overflow:hidden;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -214,7 +215,7 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
 .about-hint{font-size:11px;color:var(--blue2);margin-top:8px;}
 
 /* ── ABOUT FULLSCREEN ── */
-.about-full{position:fixed;inset:0;background:#003F87;z-index:400;display:none;
+.about-full{position:fixed;inset:0;background:#111D3D;z-index:400;display:none;
   flex-direction:column;align-items:center;justify-content:center;padding:30px 24px;}
 .about-full.open{display:flex;}
 .about-full-logo{width:120px;height:120px;border-radius:20px;background:#fff;overflow:hidden;
