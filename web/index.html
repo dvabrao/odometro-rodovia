@@ -25,8 +25,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .logo-fallback{background:#003F87;width:48px;height:48px;border-radius:10px;display:flex;
   align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:800;flex-shrink:0;}
 .header-title{flex:1;}
-.header-title h1{font-size:16px;font-weight:800;color:var(--blue);line-height:1.2;}
-.header-title p{font-size:11px;color:var(--sub);}
+.header-title h1{font-size:16px;font-weight:800;color:var(--blue);line-height:1.2;text-transform:uppercase;letter-spacing:.5px;}
+.header-title p{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;}
 .btn-icon{width:40px;height:40px;border-radius:10px;border:1px solid var(--border);background:var(--card);
   display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;flex-shrink:0;}
 
@@ -970,32 +970,44 @@ function exportPDF(){
   }).join('');
   const secInfo=secIni!=null?`KM Início: ${fmtFull(secIni)} &nbsp;|&nbsp; KM Fim: ${fmtFull(secFim)} &nbsp;|&nbsp; Extensão: ${fmtFull(Math.abs((secFim||0)-(secIni||0)))}`:'';
   const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Relatório — Odômetro Rodovia Pro</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:18px;}
+body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:0;}
+.toolbar{position:sticky;top:0;background:#111D3D;color:#fff;padding:10px 14px;
+  display:flex;align-items:center;justify-content:space-between;z-index:10;}
+.toolbar h2{font-size:13px;font-weight:700;}
+.btn-close{background:#F5C500;color:#111D3D;border:none;border-radius:8px;
+  padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;}
+.content{padding:16px;}
 .top{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
-.logo-box{width:48px;height:48px;background:#003F87;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;}
-h1{font-size:15px;color:#003F87;}
+.logo-box{width:48px;height:48px;background:#111D3D;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex-shrink:0;}
+h1{font-size:15px;color:#111D3D;}
 .sub{font-size:10px;color:#555;margin-bottom:4px;}
-.sec{font-size:10px;color:#003F87;font-weight:600;margin-bottom:12px;}
+.sec{font-size:10px;color:#111D3D;font-weight:600;margin-bottom:12px;}
 table{width:100%;border-collapse:collapse;}
-th{background:#003F87;color:#fff;padding:6px 7px;text-align:left;font-size:9px;text-transform:uppercase;}
+th{background:#111D3D;color:#fff;padding:6px 7px;text-align:left;font-size:9px;text-transform:uppercase;}
 td{padding:6px 7px;border-bottom:1px solid #e0e0e0;vertical-align:top;}
 tr:nth-child(even) td{background:#f5f8ff;}
 .obs{color:#555;font-style:italic;}
 .mono{font-family:monospace;font-size:9px;}
 .foot{margin-top:12px;font-size:10px;color:#888;text-align:right;}
-@media print{body{padding:0;}}
+@media print{.toolbar{display:none;}body{padding:0;}.content{padding:0;}}
 </style></head><body>
+<div class="toolbar">
+  <h2>Relatório de Pontos</h2>
+  <button class="btn-close" onclick="window.close()">✕ Fechar</button>
+</div>
+<div class="content">
 <div class="top"><div class="logo-box">DVA</div>
-<div><h1>Relatório de Pontos — Odômetro Rodovia Pro</h1>
+<div><h1>Odômetro Rodovia Pro</h1>
 <div class="sub">DVABRAO SERVIÇOS LTDA &nbsp;·&nbsp; Gerado em: ${dt}</div></div></div>
 <div class="sec">KM Inicial: ${fmtFull(kmIni)} &nbsp;|&nbsp; Sentido: ${dir==='C'?'Crescente':'Decrescente'}${secInfo?' &nbsp;|&nbsp; '+secInfo:''}</div>
 <table><thead><tr><th>#</th><th>Tipo / Descrição</th><th>KM</th><th>Coordenadas</th><th>Dimensões</th></tr></thead>
 <tbody>${rows}</tbody></table>
 <div class="foot">Total: ${points.length} ponto(s)</div>
-<script>window.onload=function(){window.print();}<\/script>
+</div>
 </body></html>`;
   const w=window.open('','_blank');
   if(w){w.document.write(html);w.document.close();}
