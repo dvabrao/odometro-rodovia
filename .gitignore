@@ -1,0 +1,10 @@
+# Android build
+android/.gradle/
+android/app/build/
+android/build/
+*.apk
+!android/app/odometro.jks
+
+# Node / misc
+node_modules/
+.DS_Store

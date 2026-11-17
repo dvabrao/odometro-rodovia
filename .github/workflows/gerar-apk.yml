@@ -1,0 +1,55 @@
+name: Gerar APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Copiar o app para dentro do projeto Android
+        run: |
+          mkdir -p android/app/src/main/assets/www
+          cp -r web/. android/app/src/main/assets/www/
+
+      - name: Compilar o APK
+        run: gradle -p android assembleRelease --no-daemon --stacktrace
+
+      - name: Renomear
+        run: cp android/app/build/outputs/apk/release/app-release.apk OdometroRodovia.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OdometroRodovia-apk
+          path: OdometroRodovia.apk
+
+      - name: Publicar em Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Odômetro Rodovia Pro v1.0.${{ github.run_number }}
+          files: OdometroRodovia.apk
+          body: |
+            Toque em **OdometroRodovia.apk** abaixo para baixar e instalar no Android.
+            Se o Android pedir, permita "instalar apps desconhecidos" para o navegador.
+
+            **Novidades desta versão:**
+            - GPS continua gravando mesmo com a tela desligada
+            - Tela permanece ligada enquanto o app está aberto
+            - Exportação de rotas em KML, KMZ e PDF
