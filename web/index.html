@@ -407,17 +407,17 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   <div class="modal">
     <div class="modal-title">📤 Exportar Levantamento<button class="modal-close" onclick="closeModal('modal-exp')">✕</button></div>
     <div class="exp-btn-list">
-      <button class="exp-opt" onclick="exportKML();closeModal('modal-exp')">
+      <button class="exp-opt" onclick="shareOrDl('kml');closeModal('modal-exp')">
         <span class="ico">🗺️</span>
-        <div><div class="lbl">KML</div><div class="sub">Rota + pontos para Google Earth / Maps</div></div>
+        <div><div class="lbl">KML</div><div class="sub">Rota + pontos · Google Earth / Maps / Drive</div></div>
       </button>
-      <button class="exp-opt" onclick="exportKMZ();closeModal('modal-exp')">
+      <button class="exp-opt" onclick="shareOrDl('kmz');closeModal('modal-exp')">
         <span class="ico">📦</span>
-        <div><div class="lbl">KMZ</div><div class="sub">KML compactado (.kmz)</div></div>
+        <div><div class="lbl">KMZ</div><div class="sub">KML compactado · Drive / WhatsApp / e-mail</div></div>
       </button>
-      <button class="exp-opt" onclick="exportPDF();closeModal('modal-exp')">
+      <button class="exp-opt" onclick="shareOrDl('rel');closeModal('modal-exp')">
         <span class="ico">📄</span>
-        <div><div class="lbl">PDF — Relatório de Pontos</div><div class="sub">Descrição, coordenadas e dimensões de cada ponto</div></div>
+        <div><div class="lbl">Relatório de Pontos</div><div class="sub">PDF / WhatsApp / Drive · preto no branco</div></div>
       </button>
     </div>
   </div>
@@ -428,9 +428,8 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   <div class="modal">
     <div class="modal-title">🏁 Finalizar Levantamento<button class="modal-close" onclick="closeModal('modal-fin')">✕</button></div>
     <p style="font-size:13px;color:var(--sub);margin-bottom:14px;">Salve os dados antes de zerar.</p>
-    <button class="btn-full green" onclick="exportKML();closeModal('modal-fin')">🗺️ Salvar KML</button>
-    <button class="btn-full" style="margin-top:8px;background:#E3F2FD;color:var(--blue2);" onclick="exportKMZ();closeModal('modal-fin')">📦 Salvar KMZ</button>
-    <button class="btn-full" style="margin-top:8px;background:#FFF3E0;color:#E65100;" onclick="exportPDF();closeModal('modal-fin')">📄 Relatório PDF</button>
+    <button class="btn-full green" onclick="shareOrDl('kml');closeModal('modal-fin')">🗺️ KML / KMZ</button>
+    <button class="btn-full" style="margin-top:8px;background:#E3F2FD;color:var(--blue2);" onclick="shareOrDl('rel');closeModal('modal-fin')">📄 Relatório</button>
     <button class="btn-full" style="margin-top:8px;background:#FFEBEE;color:var(--red2);" onclick="clearSession();closeModal('modal-fin')">🗑️ Descartar e zerar</button>
   </div>
 </div>
@@ -912,9 +911,25 @@ function clearSession(){
 }
 
 // ════════════════════════════════
-//  EXPORT
+//  EXPORT + SHARE
 // ════════════════════════════════
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// Tenta compartilhar via share sheet nativo; se não disponível, faz download
+async function nativeShare(blob, name, title){
+  if(navigator.canShare&&navigator.canShare({files:[new File([blob],name,{type:blob.type})]})){
+    try{
+      await navigator.share({
+        title:title,
+        text:'Levantamento DVAbrao Serviços Ltda — '+new Date().toLocaleDateString('pt-BR'),
+        files:[new File([blob],name,{type:blob.type})]
+      });
+      return;
+    }catch(e){if(e.name==='AbortError') return;} // usuário cancelou
+  }
+  dl(blob,name); // fallback: download direto
+}
+
 function buildKML(){
   let kml=`<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document>
@@ -940,78 +955,112 @@ function buildKML(){
   });
   return kml+`</Document></kml>`;
 }
-function exportKML(){
-  dl(new Blob([buildKML()],{type:'application/vnd.google-earth.kml+xml'}),
-    'OdometroRodovia_'+dateSuffix()+'.kml');
-}
-async function exportKMZ(){
-  try{
-    const zip=new window.JSZip();
-    zip.file('doc.kml',buildKML());
-    dl(await zip.generateAsync({type:'blob',compression:'DEFLATE'}),
-      'OdometroRodovia_'+dateSuffix()+'.kmz');
-  }catch(e){exportKML();}
-}
-function exportPDF(){
-  if(!points.length){
-    alert('Nenhum ponto registrado para gerar relatório.');return;
-  }
+
+function buildRelatorioHTML(){
   const dt=new Date().toLocaleString('pt-BR');
   const rows=points.map((p,i)=>{
-    const dims=[p.w?'L: '+p.w+' m':'',p.l?'C: '+p.l+' m':'',p.h?'E: '+p.h+' cm':''].filter(Boolean).join('<br>');
-    const coord=p.lat?p.lat.toFixed(6)+'<br>'+p.lon.toFixed(6):'—';
+    const dims=[p.w?'L: '+p.w+' m':'',p.l?'C: '+p.l+' m':'',p.h?'E: '+p.h+' cm':''].filter(Boolean).join(' | ');
+    const coord=p.lat?p.lat.toFixed(6)+', '+p.lon.toFixed(6):'—';
     return`<tr>
-      <td>${i+1}</td>
-      <td><strong>${esc(p.type)}</strong>${p.obs?'<br><span class="obs">'+esc(p.obs)+'</span>':''}</td>
-      <td>${fmtFull(p.km)}</td>
-      <td class="mono">${coord}</td>
-      <td>${dims||'—'}</td>
+      <td style="text-align:center">${i+1}</td>
+      <td><b>${esc(p.type)}</b>${p.obs?'<br><i style="color:#555">'+esc(p.obs)+'</i>':''}</td>
+      <td style="text-align:center;white-space:nowrap">${fmtFull(p.km)}</td>
+      <td style="font-family:monospace;font-size:9px">${coord}</td>
+      <td style="font-size:10px">${dims||'—'}</td>
     </tr>`;
   }).join('');
-  const secInfo=secIni!=null?`KM Início: ${fmtFull(secIni)} &nbsp;|&nbsp; KM Fim: ${fmtFull(secFim)} &nbsp;|&nbsp; Extensão: ${fmtFull(Math.abs((secFim||0)-(secIni||0)))}`:'';
-  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+  const secInfo=secIni!=null?`KM Início: ${fmtFull(secIni)} | KM Fim: ${fmtFull(secFim)} | Extensão: ${fmtFull(Math.abs((secFim||0)-(secIni||0)))}`:'';
+  return`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Relatório — Odômetro Rodovia Pro</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:Arial,sans-serif;font-size:11px;color:#111;background:#fff;padding:0;}
-.toolbar{position:sticky;top:0;background:#111D3D;color:#fff;padding:10px 14px;
-  display:flex;align-items:center;justify-content:space-between;z-index:10;}
-.toolbar h2{font-size:13px;font-weight:700;}
-.btn-close{background:#F5C500;color:#111D3D;border:none;border-radius:8px;
-  padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;}
-.content{padding:16px;}
-.top{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
-.logo-box{width:48px;height:48px;background:#111D3D;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;flex-shrink:0;}
-h1{font-size:15px;color:#111D3D;}
-.sub{font-size:10px;color:#555;margin-bottom:4px;}
-.sec{font-size:10px;color:#111D3D;font-weight:600;margin-bottom:12px;}
-table{width:100%;border-collapse:collapse;}
-th{background:#111D3D;color:#fff;padding:6px 7px;text-align:left;font-size:9px;text-transform:uppercase;}
-td{padding:6px 7px;border-bottom:1px solid #e0e0e0;vertical-align:top;}
-tr:nth-child(even) td{background:#f5f8ff;}
-.obs{color:#555;font-style:italic;}
-.mono{font-family:monospace;font-size:9px;}
-.foot{margin-top:12px;font-size:10px;color:#888;text-align:right;}
-@media print{.toolbar{display:none;}body{padding:0;}.content{padding:0;}}
-</style></head><body>
+html,body{background:#ffffff!important;color:#111111!important;margin:0;padding:0;}
+*{box-sizing:border-box;}
+body{font-family:Arial,Helvetica,sans-serif;font-size:11px;}
+.toolbar{background:#ffffff;border-bottom:2px solid #111;padding:10px 14px;
+  display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;}
+.toolbar-title{font-size:13px;font-weight:700;color:#111;}
+.btn-fechar{background:#111;color:#fff;border:none;border-radius:6px;
+  padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;}
+.content{padding:16px 14px;}
+.cabecalho{border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:10px;}
+.empresa{font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;}
+.subtitulo{font-size:11px;color:#333;margin-top:3px;}
+.info-linha{font-size:10px;font-weight:600;margin-top:6px;color:#222;}
+table{width:100%;border-collapse:collapse;margin-top:6px;}
+th{background:#111;color:#fff;padding:7px 6px;text-align:left;font-size:9px;
+  text-transform:uppercase;letter-spacing:.5px;}
+td{padding:7px 6px;border-bottom:1px solid #ccc;vertical-align:top;color:#111;}
+tr:nth-child(even) td{background:#f4f4f4;}
+.rodape{margin-top:14px;font-size:10px;color:#555;text-align:right;border-top:1px solid #ccc;padding-top:8px;}
+@media print{
+  .toolbar{display:none!important;}
+  html,body{background:#fff!important;}
+  td,th{color:#000!important;}
+}
+</style>
+</head>
+<body>
 <div class="toolbar">
-  <h2>Relatório de Pontos</h2>
-  <button class="btn-close" onclick="window.close()">✕ Fechar</button>
+  <span class="toolbar-title">Relatório de Pontos</span>
+  <button class="btn-fechar" onclick="window.close()">✕ Fechar</button>
 </div>
 <div class="content">
-<div class="top"><div class="logo-box">DVA</div>
-<div><h1>Odômetro Rodovia Pro</h1>
-<div class="sub">DVABRAO SERVIÇOS LTDA &nbsp;·&nbsp; Gerado em: ${dt}</div></div></div>
-<div class="sec">KM Inicial: ${fmtFull(kmIni)} &nbsp;|&nbsp; Sentido: ${dir==='C'?'Crescente':'Decrescente'}${secInfo?' &nbsp;|&nbsp; '+secInfo:''}</div>
-<table><thead><tr><th>#</th><th>Tipo / Descrição</th><th>KM</th><th>Coordenadas</th><th>Dimensões</th></tr></thead>
-<tbody>${rows}</tbody></table>
-<div class="foot">Total: ${points.length} ponto(s)</div>
+  <div class="cabecalho">
+    <div class="empresa">DVAbrao Serviços Ltda</div>
+    <div class="subtitulo">Odômetro Rodovia Pro &nbsp;·&nbsp; Gerado em: ${dt}</div>
+    <div class="info-linha">
+      KM Inicial: ${fmtFull(kmIni)} &nbsp;|&nbsp; Sentido: ${dir==='C'?'Crescente':'Decrescente'}${secInfo?' &nbsp;|&nbsp; '+secInfo:''}
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Tipo / Descrição</th><th>KM</th><th>Coordenadas</th><th>Dimensões</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="rodape">Total: ${points.length} ponto(s)</div>
 </div>
-</body></html>`;
-  const w=window.open('','_blank');
-  if(w){w.document.write(html);w.document.close();}
-  else alert('Permita pop-ups para gerar o PDF.');
+</body>
+</html>`;
+}
+
+async function shareOrDl(tipo){
+  const suf=dateSuffix();
+  if(tipo==='kml'){
+    const blob=new Blob([buildKML()],{type:'application/vnd.google-earth.kml+xml'});
+    await nativeShare(blob,'OdometroRodovia_'+suf+'.kml','Levantamento KML');
+  } else if(tipo==='kmz'){
+    try{
+      const zip=new window.JSZip();
+      zip.file('doc.kml',buildKML());
+      const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+      await nativeShare(blob,'OdometroRodovia_'+suf+'.kmz','Levantamento KMZ');
+    }catch(e){
+      const blob=new Blob([buildKML()],{type:'application/vnd.google-earth.kml+xml'});
+      await nativeShare(blob,'OdometroRodovia_'+suf+'.kml','Levantamento KML');
+    }
+  } else if(tipo==='rel'){
+    if(!points.length){alert('Nenhum ponto registrado.');return;}
+    const html=buildRelatorioHTML();
+    const blob=new Blob([html],{type:'text/html'});
+    // Tenta share nativo; se não suportar arquivo HTML, abre numa janela
+    if(navigator.canShare&&navigator.canShare({files:[new File([blob],'Relatorio_'+suf+'.html',{type:'text/html'})]})){
+      try{
+        await navigator.share({
+          title:'Relatório DVAbrao',
+          text:'Levantamento de pontos — DVAbrao Serviços Ltda',
+          files:[new File([blob],'Relatorio_'+suf+'.html',{type:'text/html'})]
+        });
+        return;
+      }catch(e){if(e.name==='AbortError') return;}
+    }
+    // Fallback: abre em nova janela para visualizar/imprimir
+    const w=window.open('','_blank');
+    if(w){w.document.write(html);w.document.close();}
+    else dl(blob,'Relatorio_'+suf+'.html');
+  }
 }
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();}
 function dateSuffix(){return new Date().toISOString().slice(0,10).replace(/-/g,'');}
