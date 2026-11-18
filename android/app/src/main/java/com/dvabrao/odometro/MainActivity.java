@@ -58,11 +58,11 @@ public class MainActivity extends Activity {
             gpsService = ((GpsService.LocalBinder) binder).getService();
             serviceBound = true;
             // Injeta callback: quando o serviço receber posição, chama JS
-            gpsService.setPositionCallback((lat, lon, acc, speed, bearing) -> {
+            gpsService.setPositionCallback((lat, lon, acc, speed, bearing, source) -> {
                 if (web != null) {
                     final String js = String.format(
-                            "window._nativeGpsPosition && window._nativeGpsPosition(%f,%f,%f,%f,%f);",
-                            lat, lon, acc, speed, bearing);
+                            "window._nativeGpsPosition && window._nativeGpsPosition(%f,%f,%f,%f,'%s');",
+                            lat, lon, acc, speed, source);
                     web.post(() -> web.evaluateJavascript(js, null));
                 }
             });
@@ -195,6 +195,17 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String isNative() {
             return "true";
+        }
+
+        /** Retorna a versão do app (versionName do build.gradle) */
+        @JavascriptInterface
+        public String getVersion() {
+            try {
+                return getPackageManager()
+                        .getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception e) {
+                return "1.0";
+            }
         }
     }
 

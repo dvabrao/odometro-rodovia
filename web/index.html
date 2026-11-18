@@ -294,9 +294,27 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
 <!-- ══ MAIN ══ -->
 <div class="main">
 
-  <!-- GPS Banner -->
-  <div id="gps-banner" class="gps-banner warn">
+  <!-- GPS Banner (toque para abrir diagnóstico) -->
+  <div id="gps-banner" class="gps-banner warn" onclick="toggleDiag()">
     <span>📡</span><span id="gps-banner-txt">Aguardando GPS...</span>
+    <span style="float:right;font-size:10px;opacity:.6">🔍</span>
+  </div>
+
+  <!-- Painel de diagnóstico GPS -->
+  <div id="gps-diag-panel" style="display:none;background:#1A2342;border-radius:12px;margin:0 0 10px;padding:12px 14px;font-size:12px;color:#fff;">
+    <div style="font-weight:700;margin-bottom:8px;color:#FFD740;">🛰️ Diagnóstico GPS</div>
+    <table style="width:100%;border-collapse:collapse;line-height:1.9;">
+      <tr><td style="color:rgba(255,255,255,.6);width:40%">Fonte ativa</td><td id="gps-diag-src">—</td></tr>
+      <tr><td style="color:rgba(255,255,255,.6)">Posições recv.</td><td id="gps-diag-cnt">0</td></tr>
+      <tr><td style="color:rgba(255,255,255,.6)">Precisão</td><td id="gps-diag-acc">—</td></tr>
+      <tr><td style="color:rgba(255,255,255,.6)">Coordenada</td><td id="gps-diag-coord" style="font-size:11px;">aguardando...</td></tr>
+      <tr><td style="color:rgba(255,255,255,.6)">Tempo ativo</td><td id="gps-diag-ela">—</td></tr>
+      <tr><td style="color:rgba(255,255,255,.6)">Último erro</td><td id="gps-diag-err" style="color:#FF8A65;">—</td></tr>
+    </table>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button onclick="diagRestartGps()" style="flex:1;padding:8px;border:none;border-radius:8px;background:#2196F3;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">🔄 Reiniciar GPS</button>
+      <button onclick="diagTestWebview()" style="flex:1;padding:8px;border:none;border-radius:8px;background:#4CAF50;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">🌐 Testar WebView</button>
+    </div>
   </div>
 
   <!-- ODÔMETRO -->
@@ -619,7 +637,7 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
           </div>
           <div class="about-name">
             <h4>DVABRAO SERVIÇOS LTDA</h4>
-            <p>Odômetro Rodovia Pro · Versão 2.0</p>
+            <p>Odômetro Rodovia Pro · <span id="about-ver">Versão 2.0</span></p>
           </div>
         </div>
         <div class="about-body">
@@ -643,7 +661,7 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     Odômetro Rodovia Pro<br><br>
     Levantamento de campo com GPS,<br>registro de patologias e exportação KML/PDF
   </div>
-  <div class="about-full-ver">Versão 2.0 · dvabrao.com.br</div>
+  <div class="about-full-ver"><span id="about-full-ver">Versão 2.0</span> · dvabrao.com.br</div>
   <div class="paid-notice" style="max-width:340px;margin-top:20px;">
     🔒 Para remover a legenda do criador nas fotos, adquira o APK completo pelo e-mail:<br>
     <a onclick="openEmail()" style="color:#FFD740;font-size:15px;font-weight:700;text-decoration:underline;cursor:pointer;">dvabrao@gmail.com</a>
@@ -868,8 +886,50 @@ function renderTypes(){
 function isNativeApp(){
   return typeof window.NativeGPS!=='undefined'&&window.NativeGPS.isNative&&window.NativeGPS.isNative()==='true';
 }
+// ── Diagnóstico GPS ──────────────────────────────────────────────────
+const _gpsDiag={posCount:0,lastSource:'',lastError:'',startedAt:null,visible:false};
+function _updateDiagPanel(){
+  const p=document.getElementById('gps-diag-panel');
+  if(!p||!_gpsDiag.visible) return;
+  const src=_gpsDiag.lastSource||'—';
+  const srcLabel={fused:'FusedLocation',gps:'GPS nativo',network:'Rede/WiFi',webview:'WebView Geo'}[src]||src;
+  const elapsed=_gpsDiag.startedAt?Math.round((Date.now()-_gpsDiag.startedAt)/1000)+'s':'—';
+  const acc=curAcc?Math.round(curAcc)+'m':'—';
+  document.getElementById('gps-diag-src').textContent=srcLabel;
+  document.getElementById('gps-diag-cnt').textContent=_gpsDiag.posCount;
+  document.getElementById('gps-diag-acc').textContent=acc;
+  document.getElementById('gps-diag-err').textContent=_gpsDiag.lastError||'—';
+  document.getElementById('gps-diag-ela').textContent=elapsed;
+  document.getElementById('gps-diag-coord').textContent=
+    curLat?fmtCoord(curLat,curLon):'aguardando...';
+}
+function toggleDiag(){
+  const p=document.getElementById('gps-diag-panel');
+  _gpsDiag.visible=!_gpsDiag.visible;
+  if(p) p.style.display=_gpsDiag.visible?'block':'none';
+  if(_gpsDiag.visible) _updateDiagPanel();
+}
+function diagRestartGps(){
+  _gpsDiag.posCount=0; _gpsDiag.lastSource=''; _gpsDiag.lastError='';
+  _gpsDiag.startedAt=Date.now();
+  if(_nativeGpsFallbackTimer){clearTimeout(_nativeGpsFallbackTimer);_nativeGpsFallbackTimer=null;}
+  if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  startGps();
+  _updateDiagPanel();
+}
+function diagTestWebview(){
+  _gpsDiag.posCount=0; _gpsDiag.lastSource='webview'; _gpsDiag.lastError='';
+  _gpsDiag.startedAt=Date.now();
+  if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  _startWebViewGps();
+  _updateDiagPanel();
+}
+// Atualiza painel a cada 2s enquanto visível
+setInterval(()=>{if(_gpsDiag.visible)_updateDiagPanel();},2000);
+
 let _nativeGpsFallbackTimer=null;
 function startGps(){
+  _gpsDiag.startedAt=Date.now();
   if(isNativeApp()){
     window.NativeGPS.start&&window.NativeGPS.start();
     updateBanner('ok','GPS nativo ativo');
@@ -877,6 +937,7 @@ function startGps(){
     _nativeGpsFallbackTimer=setTimeout(()=>{
       if(curLat===null){
         console.warn('GPS nativo sem resposta — usando geolocation do WebView');
+        _gpsDiag.lastError='Nativo sem sinal · usando WebView';
         updateBanner('warn','GPS nativo sem sinal · tentando alternativa...');
         _startWebViewGps();
       }
@@ -886,21 +947,40 @@ function startGps(){
   _startWebViewGps();
 }
 function _startWebViewGps(){
-  if(!navigator.geolocation){updateBanner('err','GPS não disponível');return;}
+  if(!navigator.geolocation){
+    _gpsDiag.lastError='GPS não disponível';
+    updateBanner('err','GPS não disponível');
+    return;
+  }
   if(watchId!==null) return; // já iniciado
+  _gpsDiag.lastSource='webview';
   watchId=navigator.geolocation.watchPosition(
-    pos=>onPosition(pos),
+    pos=>{
+      _gpsDiag.posCount++;
+      _gpsDiag.lastSource='webview';
+      _gpsDiag.lastError='';
+      onPosition(pos);
+    },
     err=>{
-      if(err.code===1) updateBanner('err','Permissão negada. Libere a localização nas configurações.');
-      else updateBanner('warn','Aguardando sinal GPS...');
+      if(err.code===1){
+        _gpsDiag.lastError='Permissão negada';
+        updateBanner('err','Permissão negada. Libere a localização nas configurações.');
+      } else {
+        _gpsDiag.lastError='Erro código '+err.code;
+        updateBanner('warn','Aguardando sinal GPS...');
+      }
     },
     {enableHighAccuracy:true,timeout:20000,maximumAge:2000}
   );
   updateBanner('ok','Aguardando primeira posição...');
 }
 // Chamado quando chega posição nativa — cancela timer de fallback
-window._nativeGpsPosition=function(lat,lon,acc,speedMs){
+window._nativeGpsPosition=function(lat,lon,acc,speedMs,source){
   if(_nativeGpsFallbackTimer){clearTimeout(_nativeGpsFallbackTimer);_nativeGpsFallbackTimer=null;}
+  _gpsDiag.posCount++;
+  _gpsDiag.lastSource=source||'native';
+  _gpsDiag.lastError='';
+  _updateDiagPanel();
   onPosition({coords:{latitude:lat,longitude:lon,accuracy:acc,speed:speedMs}});
 };
 function updateBanner(state,txt){
@@ -1480,6 +1560,17 @@ updateOdo();
 updateTrackUI();
 renderPoints();
 startGps();
+
+// Preenche versão dinamicamente (nativo: ponte JS; web: mantém padrão)
+(function(){
+  const ver=isNativeApp()&&window.NativeGPS.getVersion
+        ?'Versão '+window.NativeGPS.getVersion()
+        :'Versão 2.0';
+  ['about-ver','about-full-ver'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.textContent=ver;
+  });
+})();
 
 // Handler da câmera
 (function(){

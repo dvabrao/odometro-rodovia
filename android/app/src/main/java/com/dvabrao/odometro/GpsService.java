@@ -7,8 +7,12 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
 
@@ -24,13 +28,12 @@ import com.google.android.gms.location.Priority;
 /**
  * Foreground Service que mantém o GPS ativo mesmo com a tela desligada.
  *
- * Como funciona:
- *  1. Inicia como foreground service (mostra notificação persistente).
- *  2. Usa FusedLocationProviderClient (GPS + WiFi + sensores) para maior precisão.
- *  3. A cada posição recebida, chama o callback registrado pelo MainActivity.
- *  4. O MainActivity repassa as coordenadas para a WebView via evaluateJavascript().
- *  5. O JS da WebView sobrescreve watchPosition() para usar essas coordenadas
- *     quando window.NativeGPS.isNative() === "true".
+ * Estratégia de dupla fonte (Dual GPS):
+ *  1. Tenta FusedLocationProviderClient (GPS + WiFi + sensores).
+ *  2. Simultaneamente usa LocationManager/GPS_PROVIDER como fallback direto.
+ *  3. A primeira fonte que entregar uma posição "vence" para aquela leitura.
+ *  4. As posições são entregues ao MainActivity via PositionCallback.
+ *  5. O MainActivity repassa para a WebView via evaluateJavascript().
  */
 public class GpsService extends Service {
 
@@ -42,14 +45,23 @@ public class GpsService extends Service {
     private static final long MIN_INTERVAL_MS = 500L;
 
     public interface PositionCallback {
-        void onPosition(double lat, double lon, float accuracy, float speed, float bearing);
+        void onPosition(double lat, double lon, float accuracy, float speed, float bearing, String source);
     }
 
     private final IBinder binder = new LocalBinder();
+
+    // Fonte 1: FusedLocation (Google Play Services)
     private FusedLocationProviderClient fusedClient;
-    private LocationCallback locationCallback;
+    private LocationCallback            fusedCallback;
+    private boolean                     fusedTracking = false;
+
+    // Fonte 2: LocationManager direto (GPS nativo do Android)
+    private LocationManager   locationManager;
+    private LocationListener  gpsListener;
+    private LocationListener  networkListener;
+    private boolean           lmTracking = false;
+
     private PositionCallback positionCallback;
-    private boolean tracking = false;
 
     // ── Binder ────────────────────────────────────────────────────────
     public class LocalBinder extends Binder {
@@ -64,12 +76,12 @@ public class GpsService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        fusedClient = LocationServices.getFusedLocationProviderClient(this);
+        fusedClient     = LocationServices.getFusedLocationProviderClient(this);
+        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // Android 10+ exige o tipo de serviço quando foregroundServiceType="location" está no manifest
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIF_ID, buildNotification(),
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
@@ -77,7 +89,7 @@ public class GpsService extends Service {
             startForeground(NOTIF_ID, buildNotification());
         }
         startTracking();
-        return START_STICKY;   // reinicia automaticamente se o sistema matar
+        return START_STICKY;
     }
 
     @Override
@@ -92,47 +104,134 @@ public class GpsService extends Service {
     }
 
     public void startTracking() {
-        if (tracking) return;
+        startFusedTracking();
+        startLocationManagerTracking();
+    }
 
-        locationCallback = new LocationCallback() {
+    public void stopTracking() {
+        stopFusedTracking();
+        stopLocationManagerTracking();
+    }
+
+    // ── Fonte 1: FusedLocationProviderClient ──────────────────────────
+    private void startFusedTracking() {
+        if (fusedTracking) return;
+
+        fusedCallback = new LocationCallback() {
             @Override
             public void onLocationResult(LocationResult result) {
                 if (result == null || positionCallback == null) return;
-                android.location.Location loc = result.getLastLocation();
+                Location loc = result.getLastLocation();
                 if (loc == null) return;
+                android.util.Log.d("GpsService", "Fused → lat=" + loc.getLatitude()
+                        + " acc=" + loc.getAccuracy());
                 positionCallback.onPosition(
-                        loc.getLatitude(),
-                        loc.getLongitude(),
-                        loc.getAccuracy(),
-                        loc.getSpeed(),     // m/s
-                        loc.getBearing());
+                        loc.getLatitude(), loc.getLongitude(),
+                        loc.getAccuracy(), loc.getSpeed(), loc.getBearing(),
+                        "fused");
             }
         };
 
         LocationRequest request = new LocationRequest.Builder(
                 Priority.PRIORITY_HIGH_ACCURACY, INTERVAL_MS)
                 .setMinUpdateIntervalMillis(MIN_INTERVAL_MS)
-                .setWaitForAccurateLocation(false)  // entrega posição de rede imediatamente, sem esperar GPS preciso
+                .setWaitForAccurateLocation(false)
                 .build();
 
         try {
-            fusedClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+            fusedClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
                     .addOnSuccessListener(v ->
-                            android.util.Log.d("GpsService", "FusedLocation: atualizações iniciadas"))
+                            android.util.Log.d("GpsService", "FusedLocation: iniciado"))
                     .addOnFailureListener(e ->
                             android.util.Log.e("GpsService", "FusedLocation falhou: " + e.getMessage(), e));
-            tracking = true;
+            fusedTracking = true;
         } catch (SecurityException e) {
-            // Permissão negada — o serviço ficará em espera
-            android.util.Log.w("GpsService", "Sem permissão de localização: " + e.getMessage());
+            android.util.Log.w("GpsService", "Fused sem permissão: " + e.getMessage());
         }
     }
 
-    public void stopTracking() {
-        if (!tracking || locationCallback == null) return;
-        fusedClient.removeLocationUpdates(locationCallback);
-        locationCallback = null;
-        tracking = false;
+    private void stopFusedTracking() {
+        if (!fusedTracking || fusedCallback == null) return;
+        fusedClient.removeLocationUpdates(fusedCallback);
+        fusedCallback = null;
+        fusedTracking = false;
+    }
+
+    // ── Fonte 2: LocationManager (GPS_PROVIDER + NETWORK_PROVIDER) ───
+    private void startLocationManagerTracking() {
+        if (lmTracking || locationManager == null) return;
+
+        gpsListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location loc) {
+                if (positionCallback == null) return;
+                android.util.Log.d("GpsService", "LM/GPS → lat=" + loc.getLatitude()
+                        + " acc=" + loc.getAccuracy());
+                positionCallback.onPosition(
+                        loc.getLatitude(), loc.getLongitude(),
+                        loc.getAccuracy(), loc.getSpeed(), loc.getBearing(),
+                        "gps");
+            }
+            @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
+            @Override public void onProviderEnabled(String provider) {}
+            @Override public void onProviderDisabled(String provider) {}
+        };
+
+        networkListener = new LocationListener() {
+            @Override
+            public void onLocationChanged(Location loc) {
+                if (positionCallback == null) return;
+                android.util.Log.d("GpsService", "LM/Network → lat=" + loc.getLatitude()
+                        + " acc=" + loc.getAccuracy());
+                positionCallback.onPosition(
+                        loc.getLatitude(), loc.getLongitude(),
+                        loc.getAccuracy(), loc.getSpeed(), loc.getBearing(),
+                        "network");
+            }
+            @Override public void onStatusChanged(String provider, int status, Bundle extras) {}
+            @Override public void onProviderEnabled(String provider) {}
+            @Override public void onProviderDisabled(String provider) {}
+        };
+
+        try {
+            boolean gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+            boolean netEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+            if (gpsEnabled) {
+                locationManager.requestLocationUpdates(
+                        LocationManager.GPS_PROVIDER,
+                        MIN_INTERVAL_MS, 0f, gpsListener, Looper.getMainLooper());
+                android.util.Log.d("GpsService", "LocationManager/GPS: iniciado");
+            } else {
+                android.util.Log.w("GpsService", "LocationManager/GPS: provider desabilitado");
+            }
+
+            if (netEnabled) {
+                locationManager.requestLocationUpdates(
+                        LocationManager.NETWORK_PROVIDER,
+                        MIN_INTERVAL_MS, 0f, networkListener, Looper.getMainLooper());
+                android.util.Log.d("GpsService", "LocationManager/Network: iniciado");
+            } else {
+                android.util.Log.w("GpsService", "LocationManager/Network: provider desabilitado");
+            }
+
+            lmTracking = true;
+        } catch (SecurityException e) {
+            android.util.Log.w("GpsService", "LocationManager sem permissão: " + e.getMessage());
+        }
+    }
+
+    private void stopLocationManagerTracking() {
+        if (!lmTracking || locationManager == null) return;
+        try {
+            if (gpsListener     != null) locationManager.removeUpdates(gpsListener);
+            if (networkListener != null) locationManager.removeUpdates(networkListener);
+        } catch (Exception e) {
+            android.util.Log.w("GpsService", "Erro ao parar LocationManager: " + e.getMessage());
+        }
+        gpsListener     = null;
+        networkListener = null;
+        lmTracking      = false;
     }
 
     // ── Notificação obrigatória do foreground service ─────────────────

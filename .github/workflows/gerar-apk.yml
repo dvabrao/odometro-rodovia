@@ -32,24 +32,24 @@ jobs:
         run: gradle -p android assembleRelease --no-daemon --stacktrace
 
       - name: Renomear
-        run: cp android/app/build/outputs/apk/release/app-release.apk OdometroRodovia.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk OdometroRodovia-v1.0.${{ github.run_number }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: OdometroRodovia-apk
-          path: OdometroRodovia.apk
+          name: OdometroRodovia-v1.0.${{ github.run_number }}
+          path: OdometroRodovia-v1.0.${{ github.run_number }}.apk
 
       - name: Publicar em Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: Odômetro Rodovia Pro v1.0.${{ github.run_number }}
-          files: OdometroRodovia.apk
+          files: OdometroRodovia-v1.0.${{ github.run_number }}.apk
           body: |
-            Toque em **OdometroRodovia.apk** abaixo para baixar e instalar no Android.
+            Toque em **OdometroRodovia-v1.0.${{ github.run_number }}.apk** abaixo para baixar e instalar no Android.
             Se o Android pedir, permita "instalar apps desconhecidos" para o navegador.
 
             **Novidades desta versão:**
-            - GPS continua gravando mesmo com a tela desligada
-            - Tela permanece ligada enquanto o app está aberto
-            - Exportação de rotas em KML, KMZ e PDF
+            - GPS dual: FusedLocation + GPS nativo em paralelo (maior confiabilidade)
+            - Painel de diagnóstico GPS (toque no banner 📡 para abrir)
+            - Versão exibida dinamicamente na tela Sobre
