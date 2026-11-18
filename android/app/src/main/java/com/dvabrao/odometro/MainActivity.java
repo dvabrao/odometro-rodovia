@@ -60,7 +60,10 @@ public class MainActivity extends Activity {
             // Injeta callback: quando o serviço receber posição, chama JS
             gpsService.setPositionCallback((lat, lon, acc, speed, bearing, source) -> {
                 if (web != null) {
-                    final String js = String.format(
+                    // IMPORTANTE: usar Locale.US para garantir ponto como separador decimal.
+                    // Sem isso, em dispositivos pt-BR o Java usa vírgula (-21,123456) e o
+                    // JavaScript interpreta como argumentos separados, corrompendo lat/lon.
+                    final String js = String.format(java.util.Locale.US,
                             "window._nativeGpsPosition && window._nativeGpsPosition(%f,%f,%f,%f,'%s');",
                             lat, lon, acc, speed, source);
                     web.post(() -> web.evaluateJavascript(js, null));
@@ -250,8 +253,18 @@ public class MainActivity extends Activity {
             }
         });
 
-        // WebChromeClient: necessário para <input type="file"> funcionar no WebView
+        // WebChromeClient: necessário para <input type="file"> e geolocation funcionar no WebView
         web.setWebChromeClient(new WebChromeClient() {
+
+            // Concede permissão de geolocation para a WebView automaticamente.
+            // Sem isso, navigator.geolocation retorna PERMISSION_DENIED mesmo com
+            // ACCESS_FINE_LOCATION concedido ao app.
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin,
+                    android.webkit.GeolocationPermissions.Callback callback) {
+                callback.invoke(origin, true, false);
+            }
+
             @Override
             public boolean onShowFileChooser(WebView webView,
                     ValueCallback<Uri[]> filePathCallback,
