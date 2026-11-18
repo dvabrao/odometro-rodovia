@@ -335,19 +335,15 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     </div>
   </div>
 
-  <!-- KM INÍCIO / FIM DO TRECHO -->
+  <!-- DISTÂNCIA PERCORRIDA + TRECHO PARCIAL -->
   <div class="km-section-row">
     <div class="km-sec-box">
-      <div class="km-sec-val" id="sec-ini">—</div>
-      <div class="km-sec-lbl">Início do Trecho</div>
+      <div class="km-sec-val" id="sec-dist">0+000</div>
+      <div class="km-sec-lbl">Percorrido</div>
     </div>
-    <div class="km-sec-box">
-      <div class="km-sec-val" id="sec-fim">—</div>
-      <div class="km-sec-lbl">Fim do Trecho</div>
-    </div>
-    <div class="km-sec-box">
-      <div class="km-sec-val" id="sec-ext">—</div>
-      <div class="km-sec-lbl">Extensão</div>
+    <div class="km-sec-box" onclick="resetTrip()" style="cursor:pointer;user-select:none;" title="Toque para zerar o trecho">
+      <div class="km-sec-val" id="trip-dist">0+000</div>
+      <div class="km-sec-lbl">Trecho ↺</div>
     </div>
   </div>
 
@@ -561,8 +557,9 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
 //  ESTADO
 // ════════════════════════════════
 let dir='C', kmIni=0, curKm=0, distTotal=0;
+let tripOffset=0; // distTotal quando trecho parcial foi zerado
 let tracking=false;
-let secIni=null, secFim=null; // km início/fim do trecho gravado
+let secIni=null, secFim=null; // km início/fim do trecho (usado no KML/relatório)
 let lastLat=null, lastLon=null, lastTime=null;
 let curLat=null, curLon=null, curAcc=0, curSpd=0;
 let watchId=null;
@@ -577,7 +574,7 @@ let tempPhoto=null; // foto temporária antes de salvar o ponto
 // ════════════════════════════════
 function save(){
   try{localStorage.setItem('odo_v2',JSON.stringify(
-    {dir,kmIni,curKm,distTotal,trackPoints,points,pointTypes,
+    {dir,kmIni,curKm,distTotal,tripOffset,trackPoints,points,pointTypes,
      secIni,secFim,settings}));}catch(e){}
 }
 function load(){
@@ -587,6 +584,7 @@ function load(){
     if(d.kmIni!=null) kmIni=d.kmIni;
     if(d.curKm!=null) curKm=d.curKm;
     if(d.distTotal!=null) distTotal=d.distTotal;
+    if(d.tripOffset!=null) tripOffset=d.tripOffset;
     if(d.trackPoints) trackPoints=d.trackPoints;
     if(d.points) points=d.points;
     if(d.pointTypes&&d.pointTypes.length) pointTypes=d.pointTypes;
@@ -696,14 +694,9 @@ function updateOdo(){
   const p=document.getElementById('pill-dir');
   if(dir==='C'){p.textContent='▲ Crescente';p.className='pill pill-dir cresc';}
   else{p.textContent='▼ Decrescente';p.className='pill pill-dir decresc';}
-  // seção início/fim
-  document.getElementById('sec-ini').textContent=secIni!=null?fmtFull(secIni):'—';
-  document.getElementById('sec-fim').textContent=secFim!=null?fmtFull(secFim):'—';
-  if(secIni!=null&&secFim!=null){
-    document.getElementById('sec-ext').textContent=fmtFull(Math.abs(secFim-secIni));
-  } else {
-    document.getElementById('sec-ext').textContent='—';
-  }
+  // percorrido total e trecho parcial
+  document.getElementById('sec-dist').textContent=fmtFull(distTotal);
+  document.getElementById('trip-dist').textContent=fmtFull(Math.max(0,distTotal-tripOffset));
 }
 function updateTrackUI(){
   const dot=document.getElementById('odo-dot');
@@ -876,7 +869,7 @@ function applyEdit(){
   const k=parseInt(document.getElementById('inp-km').value)||0;
   const m=parseInt(document.getElementById('inp-m').value)||0;
   kmIni=k+Math.min(m,999)/1000;
-  curKm=kmIni;distTotal=0;lastLat=null;lastLon=null;lastTime=null;
+  curKm=kmIni;distTotal=0;tripOffset=0;lastLat=null;lastLon=null;lastTime=null;
   secIni=null;secFim=null;
   editOpen=false;
   document.getElementById('edit-panel').style.display='none';
@@ -982,8 +975,9 @@ function openExport(){openModal('modal-exp');}
 function confirmFinish(){openModal('modal-fin');}
 function openAboutFull(){document.getElementById('about-full').classList.add('open');}
 function closeAboutFull(){document.getElementById('about-full').classList.remove('open');}
+function resetTrip(){tripOffset=distTotal;save();updateOdo();}
 function clearSession(){
-  kmIni=0;curKm=0;distTotal=0;lastLat=null;lastLon=null;lastTime=null;
+  kmIni=0;curKm=0;distTotal=0;tripOffset=0;lastLat=null;lastLon=null;lastTime=null;
   trackPoints=[];points=[];secIni=null;secFim=null;curSpd=0;
   document.getElementById('track-toggle').checked=false;
   tracking=false;
@@ -1215,7 +1209,12 @@ img{max-width:100%;max-height:100vh;object-fit:contain;}</style></head>
   }
 }
 
-function drawWatermark(ctx, w, h, pointData){
+function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
+  // imgX/Y/W/H = bounds da foto real no canvas (sem as barras pretas)
+  const ix=imgX!=null?imgX:0;
+  const iy=imgY!=null?imgY:0;
+  const iw=imgW!=null?imgW:w;
+  const ih=imgH!=null?imgH:h;
   const{type,km,lat,lon,obs}=pointData;
   const rodovia=settings.rodovia||'';
   const now=new Date();
@@ -1231,7 +1230,7 @@ function drawWatermark(ctx, w, h, pointData){
   lines.push({text:dd+'/'+mm+'/'+yy,bold:false,color:'#FFFFFF'});
   if(obs&&obs.trim()) lines.push({text:obs.substring(0,50),bold:false,color:'#CCCCCC'});
 
-  const fs=16, lineH=fs*1.4, padH=12, padV=10, borderW=5;
+  const fs=24, lineH=fs*1.4, padH=16, padV=12, borderW=7;
   let maxW=0;
   lines.forEach(l=>{
     ctx.font=(l.mono?`${fs}px monospace`:(l.bold?`bold ${fs}px 'Segoe UI',Arial,sans-serif`:`${fs}px 'Segoe UI',Arial,sans-serif`));
@@ -1240,8 +1239,9 @@ function drawWatermark(ctx, w, h, pointData){
   });
   const boxW=maxW+padH*2+borderW;
   const boxH=lines.length*lineH+padV*2;
-  const x=w-boxW-12, y=h-boxH-12;
-  const r=8;
+  // Posiciona sobre o conteúdo real da foto (canto inferior direito da imagem)
+  const x=(ix+iw)-boxW-16, y=(iy+ih)-boxH-16;
+  const r=10;
 
   // Fundo navy arredondado
   ctx.fillStyle='rgba(17,29,61,0.88)';
@@ -1281,13 +1281,9 @@ async function processPhoto(file, pointData){
       canvas.width=TW; canvas.height=TH;
       const ctx=canvas.getContext('2d');
       ctx.fillStyle='#000'; ctx.fillRect(0,0,TW,TH);
-      ctx.drawImage(img,Math.round((TW-dw)/2),Math.round((TH-dh)/2),dw,dh);
-      drawWatermark(ctx,TW,TH,pointData);
-      // Legenda do criador (pequena, canto inferior esquerdo)
-      ctx.font='11px Arial,sans-serif';
-      ctx.fillStyle='rgba(255,255,255,0.45)';
-      ctx.textAlign='left';
-      ctx.fillText('Odômetro Rodovia Pro · DVAbrao',8,TH-6);
+      const ox=Math.round((TW-dw)/2), oy=Math.round((TH-dh)/2);
+      ctx.drawImage(img,ox,oy,dw,dh);
+      drawWatermark(ctx,TW,TH,pointData,ox,oy,dw,dh);
       canvas.toBlob(blob=>{
         const reader=new FileReader();
         reader.onload=e=>resolve(e.target.result);
