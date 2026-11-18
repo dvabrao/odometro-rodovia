@@ -49,6 +49,7 @@ public class MainActivity extends Activity {
     private GpsService gpsService;
     private boolean serviceBound = false;
     private ValueCallback<Uri[]> fileChooserCallback;
+    private Uri cameraOutputUri; // URI do arquivo onde a câmera salva a foto
 
     // ── Conexão com o GpsService ──────────────────────────────────────
     private final ServiceConnection serviceConn = new ServiceConnection() {
@@ -233,18 +234,38 @@ public class MainActivity extends Activity {
                 }
                 fileChooserCallback = filePathCallback;
 
-                // Cria intent para câmera
+                // Cria arquivo temporário para a câmera salvar a foto em resolução completa
+                try {
+                    java.io.File photoDir = new java.io.File(getCacheDir(), "share");
+                    photoDir.mkdirs();
+                    java.io.File photoFile = new java.io.File(photoDir,
+                            "cam_" + System.currentTimeMillis() + ".jpg");
+                    cameraOutputUri = FileProvider.getUriForFile(
+                            MainActivity.this,
+                            getPackageName() + ".fileprovider",
+                            photoFile);
+                } catch (Exception e) {
+                    cameraOutputUri = null;
+                    android.util.Log.w("FileChooser", "Não foi possível criar URI para câmera: " + e.getMessage());
+                }
+
+                // Intent da câmera com URI de destino (evita retorno de thumbnail)
                 Intent camIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-                // Cria intent de seleção geral (galeria/câmera)
+                if (cameraOutputUri != null) {
+                    camIntent.putExtra(android.provider.MediaStore.EXTRA_OUTPUT, cameraOutputUri);
+                    camIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                }
+
+                // Intent de seleção geral (galeria) + câmera como opção extra
                 Intent chooser = fileChooserParams.createIntent();
                 Intent finalIntent = Intent.createChooser(chooser, "Selecionar imagem");
-                // Adiciona câmera como opção extra
                 finalIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{camIntent});
 
                 try {
                     startActivityForResult(finalIntent, REQ_FILE_CHOOSER);
                 } catch (Exception e) {
                     fileChooserCallback = null;
+                    cameraOutputUri = null;
                     android.util.Log.e("FileChooser", "Erro: " + e.getMessage(), e);
                     return false;
                 }
@@ -349,21 +370,24 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_FILE_CHOOSER) {
-            if (fileChooserCallback == null) return;
+            if (fileChooserCallback == null) {
+                cameraOutputUri = null;
+                return;
+            }
             Uri[] results = null;
             if (resultCode == Activity.RESULT_OK) {
-                if (data != null) {
-                    String dataString = data.getDataString();
-                    if (dataString != null) {
-                        results = new Uri[]{Uri.parse(dataString)};
-                    } else if (data.getClipData() != null) {
-                        // Múltiplos arquivos selecionados (não esperado mas tratado)
-                        results = new Uri[]{data.getClipData().getItemAt(0).getUri()};
-                    }
+                if (data != null && data.getDataString() != null) {
+                    // Galeria: retorna URI como string
+                    results = new Uri[]{Uri.parse(data.getDataString())};
+                } else if (data != null && data.getClipData() != null) {
+                    // Múltipla seleção (não esperado mas tratado)
+                    results = new Uri[]{data.getClipData().getItemAt(0).getUri()};
+                } else if (cameraOutputUri != null) {
+                    // Câmera: salvou no arquivo pré-definido (data é null ou sem URI)
+                    results = new Uri[]{cameraOutputUri};
                 }
-                // Se data == null mas RESULT_OK: câmera pode ter devolvido via thumbnail
-                // O WebView vai receber null e retornar vazio, que é aceitável
             }
+            cameraOutputUri = null;
             fileChooserCallback.onReceiveValue(results);
             fileChooserCallback = null;
         }

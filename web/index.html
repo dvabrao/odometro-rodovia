@@ -1230,7 +1230,7 @@ function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
   lines.push({text:dd+'/'+mm+'/'+yy,bold:false,color:'#FFFFFF'});
   if(obs&&obs.trim()) lines.push({text:obs.substring(0,50),bold:false,color:'#CCCCCC'});
 
-  const fs=24, lineH=fs*1.4, padH=16, padV=12, borderW=7;
+  const fs=30, lineH=fs*1.4, padH=20, padV=14, borderW=8;
   let maxW=0;
   lines.forEach(l=>{
     ctx.font=(l.mono?`${fs}px monospace`:(l.bold?`bold ${fs}px 'Segoe UI',Arial,sans-serif`:`${fs}px 'Segoe UI',Arial,sans-serif`));
