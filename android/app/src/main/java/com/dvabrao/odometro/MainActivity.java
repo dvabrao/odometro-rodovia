@@ -6,6 +6,7 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -18,6 +19,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
 
 /**
@@ -64,6 +66,49 @@ public class MainActivity extends Activity {
         }
     };
 
+    // ── Ponte de compartilhamento nativo ──────────────────────────────
+    private class NativeShareBridge {
+
+        /**
+         * Recebe arquivo em base64 do JS e abre o seletor de compartilhamento nativo do Android.
+         * Chamada pelo JS: window.NativeShare.shareFile(base64, mimeType, fileName)
+         */
+        @JavascriptInterface
+        public void shareFile(final String base64, final String mimeType, final String fileName) {
+            runOnUiThread(() -> {
+                try {
+                    // Decodifica base64 → bytes
+                    byte[] data = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+
+                    // Grava em cache/share/<fileName>
+                    java.io.File dir = new java.io.File(getCacheDir(), "share");
+                    dir.mkdirs();
+                    java.io.File outFile = new java.io.File(dir, fileName);
+                    java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile);
+                    fos.write(data);
+                    fos.close();
+
+                    // Obtém URI via FileProvider (necessário para Android 7+)
+                    Uri uri = FileProvider.getUriForFile(
+                            MainActivity.this,
+                            getPackageName() + ".fileprovider",
+                            outFile);
+
+                    // Cria Intent de compartilhamento
+                    Intent share = new Intent(Intent.ACTION_SEND);
+                    share.setType(mimeType);
+                    share.putExtra(Intent.EXTRA_STREAM, uri);
+                    share.putExtra(Intent.EXTRA_SUBJECT, fileName);
+                    share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                    startActivity(Intent.createChooser(share, "Compartilhar " + fileName));
+                } catch (Exception e) {
+                    android.util.Log.e("NativeShare", "Erro ao compartilhar: " + e.getMessage(), e);
+                }
+            });
+        }
+    }
+
     // ── Ponte JavaScript ──────────────────────────────────────────────
     private class GpsBridge {
 
@@ -99,7 +144,7 @@ public class MainActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         web = new WebView(this);
-        web.setBackgroundColor(0xFF003F87);
+        web.setBackgroundColor(0xFFFFFFFF); // branco — evita flash azul no relatório PDF
         setContentView(web);
 
         // Asset loader: serve assets/www/* como https://appassets.androidplatform.net/assets/www/
@@ -124,8 +169,9 @@ public class MainActivity extends Activity {
         s.setGeolocationEnabled(true);
         s.setUserAgentString(s.getUserAgentString() + " OdometroApp/1.0");
 
-        // Injeta ponte JS: window.NativeGPS
+        // Injeta pontes JS: window.NativeGPS e window.NativeShare
         web.addJavascriptInterface(new GpsBridge(), "NativeGPS");
+        web.addJavascriptInterface(new NativeShareBridge(), "NativeShare");
 
         if (state != null) web.restoreState(state);
         else               web.loadUrl(START_URL);

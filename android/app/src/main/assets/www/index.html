@@ -752,6 +752,11 @@ function updateBanner(state,txt){
 }
 function onPosition(pos){
   const lat=pos.coords.latitude, lon=pos.coords.longitude;
+  // Rejeita coordenadas inválidas (GPS pode retornar lixo como longitude 199485)
+  if(Math.abs(lat)>90||Math.abs(lon)>180){
+    console.warn('Coordenada GPS inválida ignorada:',lat,lon);
+    return;
+  }
   const acc=Math.abs(pos.coords.accuracy||999);
   const now=Date.now();
   curLat=lat; curLon=lon; curAcc=acc;
@@ -915,9 +920,26 @@ function clearSession(){
 // ════════════════════════════════
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-// Tenta compartilhar via share sheet nativo; se não disponível, faz download
+// Compartilha arquivo: usa ponte Java nativa (APK) → Web Share API → download
 async function nativeShare(blob, name, title){
-  if(navigator.canShare&&navigator.canShare({files:[new File([blob],name,{type:blob.type})]})){
+  // 1ª opção: ponte Java NativeShare (APK Android — abre o seletor nativo)
+  if(typeof window.NativeShare !== 'undefined' && window.NativeShare.shareFile){
+    try{
+      const reader = new FileReader();
+      await new Promise((resolve, reject) => {
+        reader.onload = resolve;
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      // dataURL = "data:<mime>;base64,<data>" — extrai só o base64
+      const dataUrl = reader.result;
+      const base64 = dataUrl.split(',')[1];
+      window.NativeShare.shareFile(base64, blob.type || 'application/octet-stream', name);
+      return;
+    }catch(e){ console.warn('NativeShare falhou, tentando Web Share API', e); }
+  }
+  // 2ª opção: Web Share API nível 2 (browsers modernos em HTTPS)
+  if(navigator.canShare && navigator.canShare({files:[new File([blob],name,{type:blob.type})]})){
     try{
       await navigator.share({
         title:title,
@@ -925,9 +947,10 @@ async function nativeShare(blob, name, title){
         files:[new File([blob],name,{type:blob.type})]
       });
       return;
-    }catch(e){if(e.name==='AbortError') return;} // usuário cancelou
+    }catch(e){if(e.name==='AbortError') return;}
   }
-  dl(blob,name); // fallback: download direto
+  // Fallback: download direto
+  dl(blob,name);
 }
 
 function buildKML(){
@@ -1045,21 +1068,23 @@ async function shareOrDl(tipo){
     if(!points.length){alert('Nenhum ponto registrado.');return;}
     const html=buildRelatorioHTML();
     const blob=new Blob([html],{type:'text/html'});
-    // Tenta share nativo; se não suportar arquivo HTML, abre numa janela
-    if(navigator.canShare&&navigator.canShare({files:[new File([blob],'Relatorio_'+suf+'.html',{type:'text/html'})]})){
+    const relName='Relatorio_'+suf+'.html';
+    // No APK: usa NativeShare (abre seletor nativo)
+    if(typeof window.NativeShare !== 'undefined' && window.NativeShare.shareFile){
+      await nativeShare(blob, relName, 'Relatório DVAbrao');
+      return;
+    }
+    // Browser: tenta Web Share API
+    if(navigator.canShare&&navigator.canShare({files:[new File([blob],relName,{type:'text/html'})]})){
       try{
-        await navigator.share({
-          title:'Relatório DVAbrao',
-          text:'Levantamento de pontos — DVAbrao Serviços Ltda',
-          files:[new File([blob],'Relatorio_'+suf+'.html',{type:'text/html'})]
-        });
+        await navigator.share({title:'Relatório DVAbrao',text:'Levantamento DVAbrao Serviços Ltda',files:[new File([blob],relName,{type:'text/html'})]});
         return;
       }catch(e){if(e.name==='AbortError') return;}
     }
     // Fallback: abre em nova janela para visualizar/imprimir
     const w=window.open('','_blank');
     if(w){w.document.write(html);w.document.close();}
-    else dl(blob,'Relatorio_'+suf+'.html');
+    else dl(blob,relName);
   }
 }
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();}
