@@ -1291,7 +1291,7 @@ function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
   const iy=imgY!=null?imgY:0;
   const iw=imgW!=null?imgW:w;
   const ih=imgH!=null?imgH:h;
-  const{type,km,lat,lon,obs,w,l,h}=pointData;
+  const{type,km,lat,lon,obs,w:dW,l:dL,h:dH}=pointData; // dW/dL/dH = dimensões do ponto
   const rodovia=settings.rodovia||'';
   const wm=settings.wm||{};
   const now=new Date();
@@ -1307,9 +1307,9 @@ function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
   }
   if(wm.dims!==false){
     const dimParts=[];
-    if(w) dimParts.push('L:'+w+'m');
-    if(l) dimParts.push('C:'+l+'m');
-    if(h) dimParts.push('E:'+h+'cm');
+    if(dW) dimParts.push('L:'+dW+'m');
+    if(dL) dimParts.push('C:'+dL+'m');
+    if(dH) dimParts.push('E:'+dH+'cm');
     if(dimParts.length) lines.push({text:dimParts.join('  '),bold:false,color:'#E0E0E0'});
   }
   if(wm.coord!==false && lat!=null) lines.push({text:lat.toFixed(6)+', '+lon.toFixed(6),bold:false,color:'#FFFFFF',mono:true});

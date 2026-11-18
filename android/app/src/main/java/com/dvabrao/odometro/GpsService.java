@@ -6,22 +6,25 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Binder;
-import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Looper;
 
 import androidx.core.app.NotificationCompat;
+
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
 
 /**
  * Foreground Service que mantém o GPS ativo mesmo com a tela desligada.
  *
  * Como funciona:
  *  1. Inicia como foreground service (mostra notificação persistente).
- *  2. Registra um LocationListener no LocationManager com intervalo de 1 s / 2 m.
+ *  2. Usa FusedLocationProviderClient (GPS + WiFi + sensores) para maior precisão.
  *  3. A cada posição recebida, chama o callback registrado pelo MainActivity.
  *  4. O MainActivity repassa as coordenadas para a WebView via evaluateJavascript().
  *  5. O JS da WebView sobrescreve watchPosition() para usar essas coordenadas
@@ -29,20 +32,20 @@ import androidx.core.app.NotificationCompat;
  */
 public class GpsService extends Service {
 
-    private static final String CHANNEL_ID   = "odometro_gps";
-    private static final int    NOTIF_ID     = 1001;
+    private static final String CHANNEL_ID = "odometro_gps";
+    private static final int    NOTIF_ID   = 1001;
 
-    // Intervalo mínimo: 1 s, deslocamento mínimo: 2 m
-    private static final long   MIN_TIME_MS  = 1_000L;
-    private static final float  MIN_DIST_M   = 2.0f;
+    // Intervalo de atualização: 1 s, intervalo mínimo: 500 ms
+    private static final long INTERVAL_MS     = 1_000L;
+    private static final long MIN_INTERVAL_MS = 500L;
 
     public interface PositionCallback {
         void onPosition(double lat, double lon, float accuracy, float speed, float bearing);
     }
 
     private final IBinder binder = new LocalBinder();
-    private LocationManager locationManager;
-    private LocationListener locationListener;
+    private FusedLocationProviderClient fusedClient;
+    private LocationCallback locationCallback;
     private PositionCallback positionCallback;
     private boolean tracking = false;
 
@@ -59,7 +62,7 @@ public class GpsService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        fusedClient = LocationServices.getFusedLocationProviderClient(this);
     }
 
     @Override
@@ -82,50 +85,41 @@ public class GpsService extends Service {
 
     public void startTracking() {
         if (tracking) return;
-        locationListener = new LocationListener() {
+
+        locationCallback = new LocationCallback() {
             @Override
-            public void onLocationChanged(Location loc) {
-                if (positionCallback != null) {
-                    positionCallback.onPosition(
-                            loc.getLatitude(),
-                            loc.getLongitude(),
-                            loc.getAccuracy(),
-                            loc.getSpeed(),       // m/s
-                            loc.getBearing());
-                }
+            public void onLocationResult(LocationResult result) {
+                if (result == null || positionCallback == null) return;
+                android.location.Location loc = result.getLastLocation();
+                if (loc == null) return;
+                positionCallback.onPosition(
+                        loc.getLatitude(),
+                        loc.getLongitude(),
+                        loc.getAccuracy(),
+                        loc.getSpeed(),     // m/s
+                        loc.getBearing());
             }
-            @Override public void onStatusChanged(String p, int s, Bundle e) {}
-            @Override public void onProviderEnabled(String p)  {}
-            @Override public void onProviderDisabled(String p) {}
         };
 
+        LocationRequest request = new LocationRequest.Builder(
+                Priority.PRIORITY_HIGH_ACCURACY, INTERVAL_MS)
+                .setMinUpdateIntervalMillis(MIN_INTERVAL_MS)
+                .build();
+
         try {
-            // GPS provider (preciso, funciona em campo)
-            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER,
-                        MIN_TIME_MS, MIN_DIST_M,
-                        locationListener, Looper.getMainLooper());
-            }
-            // Network provider como fallback
-            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                locationManager.requestLocationUpdates(
-                        LocationManager.NETWORK_PROVIDER,
-                        MIN_TIME_MS, MIN_DIST_M,
-                        locationListener, Looper.getMainLooper());
-            }
+            fusedClient.requestLocationUpdates(
+                    request, locationCallback, Looper.getMainLooper());
             tracking = true;
         } catch (SecurityException e) {
             // Permissão negada — o serviço ficará em espera
+            android.util.Log.w("GpsService", "Sem permissão de localização: " + e.getMessage());
         }
     }
 
     public void stopTracking() {
-        if (!tracking || locationListener == null) return;
-        try {
-            locationManager.removeUpdates(locationListener);
-        } catch (Exception ignored) {}
-        locationListener = null;
+        if (!tracking || locationCallback == null) return;
+        fusedClient.removeLocationUpdates(locationCallback);
+        locationCallback = null;
         tracking = false;
     }
 
