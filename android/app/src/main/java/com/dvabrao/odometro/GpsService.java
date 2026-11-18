@@ -6,7 +6,9 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.os.Binder;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.Looper;
 
@@ -67,7 +69,13 @@ public class GpsService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startForeground(NOTIF_ID, buildNotification());
+        // Android 10+ exige o tipo de serviço quando foregroundServiceType="location" está no manifest
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIF_ID, buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+        } else {
+            startForeground(NOTIF_ID, buildNotification());
+        }
         startTracking();
         return START_STICKY;   // reinicia automaticamente se o sistema matar
     }
@@ -107,8 +115,11 @@ public class GpsService extends Service {
                 .build();
 
         try {
-            fusedClient.requestLocationUpdates(
-                    request, locationCallback, Looper.getMainLooper());
+            fusedClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+                    .addOnSuccessListener(v ->
+                            android.util.Log.d("GpsService", "FusedLocation: atualizações iniciadas"))
+                    .addOnFailureListener(e ->
+                            android.util.Log.e("GpsService", "FusedLocation falhou: " + e.getMessage(), e));
             tracking = true;
         } catch (SecurityException e) {
             // Permissão negada — o serviço ficará em espera
