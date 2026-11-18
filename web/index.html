@@ -432,9 +432,9 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     <div class="field">
       <label>Dimensões (opcional)</label>
       <div class="dims-row">
-        <div class="field"><label>Largura (m)</label><input type="number" id="pt-w" placeholder="0.00" step="0.01" min="0"></div>
-        <div class="field"><label>Comprimento (m)</label><input type="number" id="pt-l" placeholder="0.00" step="0.01" min="0"></div>
-        <div class="field"><label>Espessura (cm)</label><input type="number" id="pt-h" placeholder="0" step="0.5" min="0"></div>
+        <div class="field"><label>Largura (m)</label><input type="text" inputmode="decimal" id="pt-w" placeholder="ex: 1,20"></div>
+        <div class="field"><label>Comprimento (m)</label><input type="text" inputmode="decimal" id="pt-l" placeholder="ex: 3,50"></div>
+        <div class="field"><label>Espessura (cm)</label><input type="text" inputmode="decimal" id="pt-h" placeholder="ex: 2,5"></div>
       </div>
     </div>
     <div class="field">
@@ -1093,9 +1093,11 @@ function _populatePtModal(type,obs,w,l,h,kmCoordStr,photo,titleTxt){
   sel.innerHTML=pointTypes.map(t=>`<option>${t}</option>`).join('');
   if(type){const opt=[...sel.options].find(o=>o.value===type);if(opt)sel.value=type;}
   document.getElementById('pt-obs').value=obs||'';
-  document.getElementById('pt-w').value=w||'';
-  document.getElementById('pt-l').value=l||'';
-  document.getElementById('pt-h').value=h||'';
+  // Exibe com vírgula como separador decimal (padrão pt-BR)
+  const toVirgula=v=>v?String(v).replace('.',','):'';
+  document.getElementById('pt-w').value=toVirgula(w);
+  document.getElementById('pt-l').value=toVirgula(l);
+  document.getElementById('pt-h').value=toVirgula(h);
   document.getElementById('pt-km-val').value=kmCoordStr||'';
   tempPhoto=photo||null;
   const btn=document.getElementById('pt-photo-btn');
@@ -1121,12 +1123,18 @@ function openEditPoint(idx){
   _populatePtModal(p.type,p.obs,p.w,p.l,p.h,coordStr,p.photo,'✏️ Editar Ponto #'+(idx+1));
   openModal('modal-pt');
 }
+// Converte valor digitado (aceita vírgula ou ponto) para número ou null
+function parseDimField(id){
+  const raw=(document.getElementById(id).value||'').trim().replace(',','.');
+  const n=parseFloat(raw);
+  return isNaN(n)||n<=0?null:String(n);
+}
 function savePoint(){
   const type=document.getElementById('pt-type').value;
   const obs=document.getElementById('pt-obs').value.trim();
-  const w=document.getElementById('pt-w').value||null;
-  const l=document.getElementById('pt-l').value||null;
-  const h=document.getElementById('pt-h').value||null;
+  const w=parseDimField('pt-w');
+  const l=parseDimField('pt-l');
+  const h=parseDimField('pt-h');
 
   if(editPointIdx>=0){
     // ── MODO EDIÇÃO: atualiza ponto existente ──
@@ -1589,9 +1597,9 @@ startGps();
         type:document.getElementById('pt-type').value,
         km:curKm, lat:curLat, lon:curLon,
         obs:document.getElementById('pt-obs').value.trim(),
-        w:document.getElementById('pt-w').value||null,
-        l:document.getElementById('pt-l').value||null,
-        h:document.getElementById('pt-h').value||null
+        w:parseDimField('pt-w'),
+        l:parseDimField('pt-l'),
+        h:parseDimField('pt-h')
       };
       tempPhoto=await processPhoto(file,pointData);
       if(btn){btn.innerHTML='✅ Foto tirada — toque para substituir';btn.classList.add('has-photo');}
