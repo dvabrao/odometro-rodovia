@@ -52,9 +52,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .pill-dir.cresc{background:rgba(245,197,0,.25);color:#F5C500;}
 .pill-dir.decresc{background:rgba(255,138,128,.2);color:#FF8A80;}
 .odo-big{text-align:center;cursor:pointer;user-select:none;padding:2px 0;}
-.odo-km{font-size:60px;font-weight:800;color:#fff;line-height:1;letter-spacing:-2px;}
-.odo-sep{font-size:36px;font-weight:300;color:rgba(255,255,255,.5);margin:0 2px;}
-.odo-m{font-size:60px;font-weight:800;color:rgba(255,255,255,.85);line-height:1;letter-spacing:-2px;}
+.odo-val{font-size:60px;font-weight:800;color:#fff;line-height:1;letter-spacing:-2px;}
+.odo-val .odo-dec{color:rgba(255,255,255,.75);}
+.odo-unit{font-size:16px;font-weight:400;color:rgba(255,255,255,.5);margin-left:4px;vertical-align:middle;}
 .odo-hint{text-align:center;font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;}
 .odo-latlon{text-align:center;font-size:10px;color:rgba(255,255,255,.5);margin-top:3px;
   font-family:monospace;letter-spacing:.2px;}
@@ -326,7 +326,7 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     </div>
     <div class="odo-big" onclick="toggleEdit()">
       <div>
-        <span class="odo-km" id="odo-km">0</span><span class="odo-sep">+</span><span class="odo-m" id="odo-m">000</span>
+        <span class="odo-val" id="odo-val">0<span class="odo-dec">,000</span></span><span class="odo-unit">km</span>
       </div>
       <div class="odo-hint">✎ toque para editar km e sentido</div>
     </div>
@@ -334,10 +334,8 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     <!-- Edit panel -->
     <div class="edit-panel" id="edit-panel">
       <div class="edit-row">
-        <input class="edit-inp" type="number" id="inp-km" placeholder="0" min="0">
-        <span class="edit-plus">+</span>
-        <input class="edit-inp" type="number" id="inp-m" placeholder="000" min="0" max="999" style="max-width:85px">
-        <span style="color:rgba(255,255,255,.5);font-size:12px;">m</span>
+        <input class="edit-inp" type="text" inputmode="decimal" id="inp-km" placeholder="0,000" style="text-align:center;">
+        <span style="color:rgba(255,255,255,.5);font-size:14px;">km</span>
       </div>
       <div class="dir-row">
         <button class="dir-btn sel-c" id="dir-c" onclick="setDir('C')">▲ Crescente</button>
@@ -347,7 +345,7 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     </div>
     <!-- Badges -->
     <div class="odo-sub-row">
-      <div class="odo-badge"><span id="b-dist">0+000</span><small>percorridos</small></div>
+      <div class="odo-badge"><span id="b-dist">0,000</span><small>percorridos</small></div>
       <div class="odo-badge"><span id="b-spd">0</span><small id="b-spd-unit">km/h</small></div>
       <div class="odo-badge"><span id="b-pts">0</span><small>pontos</small></div>
     </div>
@@ -370,18 +368,18 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   <!-- DISTÂNCIA PERCORRIDA + TRECHO PARCIAL -->
   <div class="km-section-row">
     <div class="km-sec-box">
-      <div class="km-sec-val" id="sec-dist">0+000</div>
+      <div class="km-sec-val" id="sec-dist">0,000</div>
       <div class="km-sec-lbl">Percorrido</div>
     </div>
     <div class="km-sec-box" onclick="resetTrip()" style="cursor:pointer;user-select:none;" title="Toque para zerar o trecho">
-      <div class="km-sec-val" id="trip-dist">0+000</div>
+      <div class="km-sec-val" id="trip-dist">0,000</div>
       <div class="km-sec-lbl">Trecho ↺</div>
     </div>
   </div>
 
   <!-- STATS -->
   <div class="stat-row">
-    <div class="stat-box"><div class="stat-val" id="stat-ini">0+000</div><div class="stat-lbl">KM Inicial</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-ini">0,000</div><div class="stat-lbl">KM Inicial</div></div>
     <div class="stat-box"><div class="stat-val" id="stat-pts">0</div><div class="stat-lbl">Pontos</div></div>
     <div class="stat-box"><div class="stat-val" id="stat-track">0</div><div class="stat-lbl">Coords GPS</div></div>
   </div>
@@ -736,14 +734,16 @@ function saveSettings(){
 // ════════════════════════════════
 //  FORMATAÇÃO
 // ════════════════════════════════
+// Formata km como decimal com 3 casas e vírgula: 1,234
+function fmtFull(km){
+  if(km==null) return '—';
+  return Math.abs(km).toFixed(3).replace('.',',');
+}
+// Mantida por compatibilidade interna (não mais usada no display principal)
 function fmtKmM(km){
   const k=Math.floor(Math.abs(km));
   const m=String(Math.round((Math.abs(km)-k)*1000)).padStart(3,'0');
   return{km:String(k),m};
-}
-function fmtFull(km){
-  if(km==null) return '—';
-  const{km:k,m}=fmtKmM(km);return k+'+'+m;
 }
 function fmtSpd(kmh){
   if(settings.spd==='ms') return (kmh/3.6).toFixed(1);
@@ -802,9 +802,12 @@ function toUTM(lat,lon){
 //  ATUALIZAR UI
 // ════════════════════════════════
 function updateOdo(){
-  const{km:k,m}=fmtKmM(curKm);
-  document.getElementById('odo-km').textContent=k;
-  document.getElementById('odo-m').textContent=m;
+  // Exibe ex: "1<span>,234</span> km"
+  const full=fmtFull(curKm); // "1,234"
+  const sep=full.indexOf(',');
+  const intPart=full.substring(0,sep);
+  const decPart=full.substring(sep); // ",234"
+  document.getElementById('odo-val').innerHTML=intPart+'<span class="odo-dec">'+decPart+'</span>';
   document.getElementById('b-dist').textContent=fmtFull(distTotal);
   document.getElementById('b-spd').textContent=fmtSpd(curSpd);
   document.getElementById('b-spd-unit').textContent=spdUnit();
@@ -1058,9 +1061,7 @@ function toggleEdit(){
   editOpen=!editOpen;
   document.getElementById('edit-panel').style.display=editOpen?'block':'none';
   if(editOpen){
-    const{km:k,m}=fmtKmM(curKm);
-    document.getElementById('inp-km').value=k;
-    document.getElementById('inp-m').value=m;
+    document.getElementById('inp-km').value=fmtFull(curKm); // ex: "1,234"
     _updDirBtns();
     setTimeout(()=>{
       document.getElementById('inp-km').focus();
@@ -1074,9 +1075,8 @@ function _updDirBtns(){
   document.getElementById('dir-d').className='dir-btn'+(dir==='D'?' sel-d':'');
 }
 function applyEdit(){
-  const k=parseInt(document.getElementById('inp-km').value)||0;
-  const m=parseInt(document.getElementById('inp-m').value)||0;
-  kmIni=k+Math.min(m,999)/1000;
+  const raw=(document.getElementById('inp-km').value||'0').replace(',','.');
+  kmIni=Math.max(0,parseFloat(raw)||0);
   curKm=kmIni;distTotal=0;tripOffset=0;lastLat=null;lastLon=null;lastTime=null;
   secIni=null;secFim=null;
   editOpen=false;
