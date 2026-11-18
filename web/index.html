@@ -734,10 +734,11 @@ function saveSettings(){
 // ════════════════════════════════
 //  FORMATAÇÃO
 // ════════════════════════════════
-// Formata km como decimal com 3 casas e vírgula: 1,234
+// Formata km como decimal com 3 casas e vírgula: 1,234 ou -1,234
 function fmtFull(km){
   if(km==null) return '—';
-  return Math.abs(km).toFixed(3).replace('.',',');
+  const sign=km<0?'-':'';
+  return sign+Math.abs(km).toFixed(3).replace('.',',');
 }
 // Mantida por compatibilidade interna (não mais usada no display principal)
 function fmtKmM(km){
@@ -808,7 +809,7 @@ function updateOdo(){
   const intPart=full.substring(0,sep);
   const decPart=full.substring(sep); // ",234"
   document.getElementById('odo-val').innerHTML=intPart+'<span class="odo-dec">'+decPart+'</span>';
-  document.getElementById('b-dist').textContent=fmtFull(distTotal);
+  document.getElementById('b-dist').textContent=fmtFull(distTotal); // distTotal é sempre ≥0
   document.getElementById('b-spd').textContent=fmtSpd(curSpd);
   document.getElementById('b-spd-unit').textContent=spdUnit();
   document.getElementById('b-pts').textContent=points.length;
