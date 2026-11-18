@@ -220,6 +220,23 @@ public class MainActivity extends Activity {
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
                 return loader.shouldInterceptRequest(req.getUrl());
             }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+                Uri uri = req.getUrl();
+                // Abre links mailto: no app de e-mail do sistema
+                if ("mailto".equals(uri.getScheme())) {
+                    try {
+                        Intent intent = new Intent(Intent.ACTION_SENDTO, uri);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(intent);
+                    } catch (Exception e) {
+                        android.util.Log.e("WebView", "Não foi possível abrir e-mail: " + e.getMessage());
+                    }
+                    return true;
+                }
+                return false; // deixa o WebView tratar links internos normalmente
+            }
         });
 
         // WebChromeClient: necessário para <input type="file"> funcionar no WebView

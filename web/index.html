@@ -178,6 +178,18 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
 .settings-header{display:flex;align-items:center;gap:10px;padding:10px 14px 12px;
   background:var(--card);border-bottom:1px solid var(--border);margin-bottom:10px;position:sticky;top:0;z-index:10;}
 .settings-header h2{flex:1;font-size:17px;font-weight:700;color:var(--blue);}
+/* Acordeão settings */
+.acc-item{background:#fff;border-radius:14px;margin:0 10px 8px;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden;}
+.acc-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none;}
+.acc-hdr-left{display:flex;align-items:center;gap:10px;}
+.acc-hdr-icon{font-size:20px;line-height:1;}
+.acc-hdr-info{display:flex;flex-direction:column;}
+.acc-hdr-title{font-size:14px;font-weight:700;color:var(--navy);}
+.acc-hdr-sub{font-size:11px;color:var(--sub);margin-top:1px;}
+.acc-arrow{font-size:14px;color:var(--sub);transition:transform .2s;font-weight:700;}
+.acc-item.open .acc-arrow{transform:rotate(90deg);}
+.acc-body{display:none;padding:0 6px 12px;}
+.acc-item.open .acc-body{display:block;}
 .settings-section{padding:0 10px 10px;}
 .settings-section h3{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;
   letter-spacing:.7px;padding:8px 0 6px;}
@@ -477,102 +489,143 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     <h2>Configurações</h2>
   </div>
 
-  <div class="settings-section">
-    <h3>Tipos de Ponto</h3>
-    <p style="font-size:12px;color:var(--sub);margin-bottom:8px;">Personalize a lista de descrições usadas ao registrar pontos.</p>
-    <div class="type-list" id="type-list"></div>
-    <div class="add-type-row">
-      <input type="text" id="new-type-inp" placeholder="Novo tipo de ponto...">
-      <button onclick="addType()">+ Adicionar</button>
-    </div>
-  </div>
-
-  <div class="settings-section" style="margin-top:4px;">
-    <h3>Identificação do Levantamento</h3>
-    <div class="card" style="padding:4px 14px;">
-      <div class="set-row">
-        <label>Código da Rodovia</label>
-        <input type="text" id="set-rodovia" placeholder="Ex.: SP-365"
-          style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;
-          font-size:13px;color:var(--text);outline:none;width:120px;text-transform:uppercase;"
-          oninput="this.value=this.value.toUpperCase()" onchange="saveSettings()">
-      </div>
-    </div>
-  </div>
-
-  <div class="settings-section" style="margin-top:4px;">
-    <h3>Campos da Marca d'água</h3>
-    <p style="font-size:12px;color:var(--sub);margin-bottom:8px;">Escolha quais informações aparecem na legenda das fotos.</p>
-    <div class="card" style="padding:4px 14px;">
-      <div class="set-row" style="opacity:.55;cursor:default;">
-        <label style="font-weight:600;color:var(--yellow);">DVABRAO SERVIÇOS LTDA</label>
-        <span style="font-size:11px;color:var(--sub);font-style:italic;">sempre visível</span>
-      </div>
-      <div class="set-row">
-        <label>Tipo de patologia</label>
-        <input type="checkbox" id="wm-type" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
-      </div>
-      <div class="set-row">
-        <label>Rodovia / KM</label>
-        <input type="checkbox" id="wm-km" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
-      </div>
-      <div class="set-row">
-        <label>Dimensões (L / C / E)</label>
-        <input type="checkbox" id="wm-dims" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
-      </div>
-      <div class="set-row">
-        <label>Coordenadas GPS</label>
-        <input type="checkbox" id="wm-coord" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
-      </div>
-      <div class="set-row">
-        <label>Data</label>
-        <input type="checkbox" id="wm-date" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
-      </div>
-      <div class="set-row">
-        <label>Observação</label>
-        <input type="checkbox" id="wm-obs" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
-      </div>
-    </div>
-  </div>
-
-  <div class="settings-section" style="margin-top:4px;">
-    <h3>Unidades</h3>
-    <div class="card" style="padding:4px 14px;">
-      <div class="set-row">
-        <label>Velocidade</label>
-        <select id="set-spd" onchange="saveSettings()">
-          <option value="kmh">km/h</option>
-          <option value="ms">m/s</option>
-          <option value="mph">mph</option>
-        </select>
-      </div>
-      <div class="set-row">
-        <label>Formato das coordenadas</label>
-        <select id="set-coord" onchange="saveSettings()">
-          <option value="dd">Graus decimais (DD)</option>
-          <option value="ddm">Graus e minutos (DDM)</option>
-          <option value="dms">Graus, min., seg. (DMS)</option>
-          <option value="utm">UTM (simplificado)</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <div class="settings-section" style="margin-top:4px;">
-    <h3>Sobre</h3>
-    <div class="about-card" onclick="openAboutFull()">
-      <div class="about-top">
-        <div id="about-logo-wrap">
-          <div class="about-logo"><img src="dvabrao-logo.png" onerror="this.parentElement.innerHTML='DVA'" style="width:100%;height:100%;object-fit:contain;"></div>
-        </div>
-        <div class="about-name">
-          <h4>DVABRAO SERVIÇOS LTDA</h4>
-          <p>Odômetro Rodovia Pro · Versão 2.0</p>
+  <!-- ── ACORDEÃO 1: Patologias ── -->
+  <div class="acc-item open" id="acc-patologias">
+    <div class="acc-hdr" onclick="toggleAcc('acc-patologias')">
+      <div class="acc-hdr-left">
+        <span class="acc-hdr-icon">🛣️</span>
+        <div class="acc-hdr-info">
+          <span class="acc-hdr-title">Patologias</span>
+          <span class="acc-hdr-sub">Tipos de defeito cadastrados</span>
         </div>
       </div>
-      <div class="about-body">
-        <p>App de levantamento de patologias rodoviárias com GPS e exportação KML/PDF.</p>
-        <p class="about-hint">Toque para ver informações completas →</p>
+      <span class="acc-arrow">›</span>
+    </div>
+    <div class="acc-body">
+      <p style="font-size:12px;color:var(--sub);margin:0 4px 8px;">Personalize a lista usada ao registrar pontos.</p>
+      <div class="type-list" id="type-list"></div>
+      <div class="add-type-row">
+        <input type="text" id="new-type-inp" placeholder="Novo tipo de ponto...">
+        <button onclick="addType()">+ Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ACORDEÃO 2: Rodovia ── -->
+  <div class="acc-item" id="acc-rodovia">
+    <div class="acc-hdr" onclick="toggleAcc('acc-rodovia')">
+      <div class="acc-hdr-left">
+        <span class="acc-hdr-icon">📍</span>
+        <div class="acc-hdr-info">
+          <span class="acc-hdr-title">Rodovia &amp; Unidades</span>
+          <span class="acc-hdr-sub">Código, velocidade e coordenadas</span>
+        </div>
+      </div>
+      <span class="acc-arrow">›</span>
+    </div>
+    <div class="acc-body">
+      <div class="card" style="padding:4px 14px;">
+        <div class="set-row">
+          <label>Código da Rodovia</label>
+          <input type="text" id="set-rodovia" placeholder="Ex.: SP-365"
+            style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;
+            font-size:13px;color:var(--text);outline:none;width:110px;text-transform:uppercase;"
+            oninput="this.value=this.value.toUpperCase()" onchange="saveSettings()">
+        </div>
+        <div class="set-row">
+          <label>Velocidade</label>
+          <select id="set-spd" onchange="saveSettings()">
+            <option value="kmh">km/h</option>
+            <option value="ms">m/s</option>
+            <option value="mph">mph</option>
+          </select>
+        </div>
+        <div class="set-row">
+          <label>Coordenadas</label>
+          <select id="set-coord" onchange="saveSettings()">
+            <option value="dd">DD (decimais)</option>
+            <option value="ddm">DDM (graus/min)</option>
+            <option value="dms">DMS (graus/min/seg)</option>
+            <option value="utm">UTM</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ACORDEÃO 3: Legenda das fotos ── -->
+  <div class="acc-item" id="acc-watermark">
+    <div class="acc-hdr" onclick="toggleAcc('acc-watermark')">
+      <div class="acc-hdr-left">
+        <span class="acc-hdr-icon">📷</span>
+        <div class="acc-hdr-info">
+          <span class="acc-hdr-title">Legenda das fotos</span>
+          <span class="acc-hdr-sub">Campos exibidos na marca d'água</span>
+        </div>
+      </div>
+      <span class="acc-arrow">›</span>
+    </div>
+    <div class="acc-body">
+      <div class="card" style="padding:4px 14px;">
+        <div class="set-row" style="opacity:.55;cursor:default;">
+          <label style="font-weight:600;color:var(--yellow);">DVABRAO SERVIÇOS LTDA</label>
+          <span style="font-size:11px;color:var(--sub);font-style:italic;">sempre visível</span>
+        </div>
+        <div class="set-row">
+          <label>Tipo de patologia</label>
+          <input type="checkbox" id="wm-type" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+        </div>
+        <div class="set-row">
+          <label>Rodovia / KM</label>
+          <input type="checkbox" id="wm-km" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+        </div>
+        <div class="set-row">
+          <label>Dimensões (L / C / E)</label>
+          <input type="checkbox" id="wm-dims" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+        </div>
+        <div class="set-row">
+          <label>Coordenadas GPS</label>
+          <input type="checkbox" id="wm-coord" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+        </div>
+        <div class="set-row">
+          <label>Data</label>
+          <input type="checkbox" id="wm-date" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+        </div>
+        <div class="set-row">
+          <label>Observação</label>
+          <input type="checkbox" id="wm-obs" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ACORDEÃO 4: Sobre ── -->
+  <div class="acc-item" id="acc-sobre" style="margin-bottom:20px;">
+    <div class="acc-hdr" onclick="toggleAcc('acc-sobre')">
+      <div class="acc-hdr-left">
+        <span class="acc-hdr-icon">ℹ️</span>
+        <div class="acc-hdr-info">
+          <span class="acc-hdr-title">Sobre o aplicativo</span>
+          <span class="acc-hdr-sub">Versão e informações</span>
+        </div>
+      </div>
+      <span class="acc-arrow">›</span>
+    </div>
+    <div class="acc-body">
+      <div class="about-card" onclick="openAboutFull()" style="margin:0 4px;">
+        <div class="about-top">
+          <div id="about-logo-wrap">
+            <div class="about-logo"><img src="dvabrao-logo.png" onerror="this.parentElement.innerHTML='DVA'" style="width:100%;height:100%;object-fit:contain;"></div>
+          </div>
+          <div class="about-name">
+            <h4>DVABRAO SERVIÇOS LTDA</h4>
+            <p>Odômetro Rodovia Pro · Versão 2.0</p>
+          </div>
+        </div>
+        <div class="about-body">
+          <p>App de levantamento de patologias rodoviárias com GPS e exportação KML/PDF.</p>
+          <p class="about-hint">Toque para ver informações completas →</p>
+        </div>
       </div>
     </div>
   </div>
@@ -593,7 +646,7 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   <div class="about-full-ver">Versão 2.0 · dvabrao.com.br</div>
   <div class="paid-notice" style="max-width:340px;margin-top:20px;">
     🔒 Para remover a legenda do criador nas fotos, adquira o APK completo pelo e-mail:<br>
-    <a href="mailto:dvabrao@gmail.com" style="color:#FFD740;font-size:13px;">dvabrao@gmail.com</a>
+    <a onclick="openEmail()" style="color:#FFD740;font-size:15px;font-weight:700;text-decoration:underline;cursor:pointer;">dvabrao@gmail.com</a>
   </div>
 </div>
 
@@ -1059,6 +1112,17 @@ function openExport(){openModal('modal-exp');}
 function confirmFinish(){openModal('modal-fin');}
 function openAboutFull(){document.getElementById('about-full').classList.add('open');}
 function closeAboutFull(){document.getElementById('about-full').classList.remove('open');}
+function toggleAcc(id){
+  const el=document.getElementById(id);
+  if(el) el.classList.toggle('open');
+}
+function openEmail(){
+  // Tenta abrir o cliente de e-mail via ponte nativa; fallback para window.location
+  const addr='dvabrao@gmail.com';
+  const subj='Odômetro Rodovia Pro - APK Completo';
+  try{ window.location.href='mailto:'+addr+'?subject='+encodeURIComponent(subj); }
+  catch(e){}
+}
 function resetTrip(){tripOffset=distTotal;save();updateOdo();}
 function clearSession(){
   kmIni=0;curKm=0;distTotal=0;tripOffset=0;lastLat=null;lastLon=null;lastTime=null;
