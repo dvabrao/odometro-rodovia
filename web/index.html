@@ -223,8 +223,8 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   flex-shrink:0;cursor:pointer;border:1.5px solid var(--border);}
 /* ── PAID NOTICE ── */
 .paid-notice{background:rgba(245,197,0,.12);border:1.5px solid var(--yellow);border-radius:10px;
-  padding:12px 14px;margin-top:14px;font-size:12px;color:var(--blue);line-height:1.6;text-align:center;}
-.paid-notice a{color:var(--blue2);font-weight:700;}
+  padding:12px 14px;margin-top:14px;font-size:12px;color:rgba(255,255,255,.9);line-height:1.6;text-align:center;}
+.paid-notice a{color:#FFD740;font-weight:700;text-decoration:underline;}
 
 /* ── ABOUT CARD ── */
 .about-card{background:var(--card);border-radius:14px;padding:0;overflow:hidden;
@@ -868,12 +868,26 @@ function renderTypes(){
 function isNativeApp(){
   return typeof window.NativeGPS!=='undefined'&&window.NativeGPS.isNative&&window.NativeGPS.isNative()==='true';
 }
-window._nativeGpsPosition=function(lat,lon,acc,speedMs){
-  onPosition({coords:{latitude:lat,longitude:lon,accuracy:acc,speed:speedMs}});
-};
+let _nativeGpsFallbackTimer=null;
 function startGps(){
-  if(isNativeApp()){window.NativeGPS.start&&window.NativeGPS.start();updateBanner('ok','GPS nativo ativo');return;}
+  if(isNativeApp()){
+    window.NativeGPS.start&&window.NativeGPS.start();
+    updateBanner('ok','GPS nativo ativo');
+    // Fallback: se não chegar nenhuma coordenada em 10s, usa geolocation do WebView
+    _nativeGpsFallbackTimer=setTimeout(()=>{
+      if(curLat===null){
+        console.warn('GPS nativo sem resposta — usando geolocation do WebView');
+        updateBanner('warn','GPS nativo sem sinal · tentando alternativa...');
+        _startWebViewGps();
+      }
+    },10000);
+    return;
+  }
+  _startWebViewGps();
+}
+function _startWebViewGps(){
   if(!navigator.geolocation){updateBanner('err','GPS não disponível');return;}
+  if(watchId!==null) return; // já iniciado
   watchId=navigator.geolocation.watchPosition(
     pos=>onPosition(pos),
     err=>{
@@ -884,6 +898,11 @@ function startGps(){
   );
   updateBanner('ok','Aguardando primeira posição...');
 }
+// Chamado quando chega posição nativa — cancela timer de fallback
+window._nativeGpsPosition=function(lat,lon,acc,speedMs){
+  if(_nativeGpsFallbackTimer){clearTimeout(_nativeGpsFallbackTimer);_nativeGpsFallbackTimer=null;}
+  onPosition({coords:{latitude:lat,longitude:lon,accuracy:acc,speed:speedMs}});
+};
 function updateBanner(state,txt){
   const b=document.getElementById('gps-banner');
   b.className='gps-banner '+state;
