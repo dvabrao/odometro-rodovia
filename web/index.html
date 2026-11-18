@@ -197,6 +197,21 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
 .set-row select{padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;
   font-size:13px;color:var(--text);outline:none;background:#fff;}
 
+/* ── CAMERA BUTTON ── */
+.btn-camera{width:100%;padding:11px;background:#E3F2FD;color:#1565C0;border:1.5px solid #90CAF9;
+  border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;gap:8px;margin-top:4px;transition:all .2s;}
+.btn-camera.has-photo{background:#E8F5E9;color:#1B5E20;border-color:#A5D6A7;}
+.modal-photo-preview{width:100%;height:140px;object-fit:cover;border-radius:10px;
+  margin-top:8px;display:none;border:2px solid #A5D6A7;}
+/* ── PHOTO THUMBNAIL IN POINT LIST ── */
+.pt-photo-thumb{width:60px;height:45px;border-radius:7px;object-fit:cover;
+  flex-shrink:0;cursor:pointer;border:1.5px solid var(--border);}
+/* ── PAID NOTICE ── */
+.paid-notice{background:rgba(245,197,0,.12);border:1.5px solid var(--yellow);border-radius:10px;
+  padding:12px 14px;margin-top:14px;font-size:12px;color:var(--blue);line-height:1.6;text-align:center;}
+.paid-notice a{color:var(--blue2);font-weight:700;}
+
 /* ── ABOUT CARD ── */
 .about-card{background:var(--card);border-radius:14px;padding:0;overflow:hidden;
   box-shadow:0 1px 4px rgba(0,0,0,.07);cursor:pointer;}
@@ -398,9 +413,14 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
       <label>Posição (KM) / Coordenadas</label>
       <input type="text" id="pt-km-val" readonly style="background:#f5f5f5;color:var(--sub);font-family:monospace;font-size:12px;">
     </div>
-    <button class="btn-full" onclick="savePoint()">✓ Salvar Ponto</button>
+    <button class="btn-camera" id="pt-photo-btn" onclick="capturePhotoForModal()">📷 Tirar Foto (opcional)</button>
+    <img class="modal-photo-preview" id="modal-photo-preview" alt="Pré-visualização">
+    <button class="btn-full" onclick="savePoint()" style="margin-top:10px;">✓ Salvar Ponto</button>
   </div>
 </div>
+
+<!-- Hidden file input for camera -->
+<input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none">
 
 <!-- ══ MODAL EXPORTAR ══ -->
 <div class="modal-overlay hidden" id="modal-exp">
@@ -462,6 +482,19 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   </div>
 
   <div class="settings-section" style="margin-top:4px;">
+    <h3>Identificação do Levantamento</h3>
+    <div class="card" style="padding:4px 14px;">
+      <div class="set-row">
+        <label>Código da Rodovia</label>
+        <input type="text" id="set-rodovia" placeholder="Ex.: SP-365"
+          style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;
+          font-size:13px;color:var(--text);outline:none;width:120px;text-transform:uppercase;"
+          oninput="this.value=this.value.toUpperCase()" onchange="saveSettings()">
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section" style="margin-top:4px;">
     <h3>Unidades</h3>
     <div class="card" style="padding:4px 14px;">
       <div class="set-row">
@@ -517,6 +550,10 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     Levantamento de campo com GPS,<br>registro de patologias e exportação KML/PDF
   </div>
   <div class="about-full-ver">Versão 2.0 · dvabrao.com.br</div>
+  <div class="paid-notice" style="max-width:340px;margin-top:20px;">
+    🔒 Para remover a legenda do criador nas fotos, adquira o APK completo pelo e-mail:<br>
+    <a href="mailto:dvabrao@gmail.com" style="color:#FFD740;font-size:13px;">dvabrao@gmail.com</a>
+  </div>
 </div>
 
 <script>
@@ -530,9 +567,10 @@ let lastLat=null, lastLon=null, lastTime=null;
 let curLat=null, curLon=null, curAcc=0, curSpd=0;
 let watchId=null;
 let trackPoints=[], points=[], pointTypes=[];
-let settings={spd:'kmh', coord:'dd'};
+let settings={spd:'kmh', coord:'dd', rodovia:''};
 const ACC_MAX=40, SPD_MAX=150;
 let pendingDelIdx=null;
+let tempPhoto=null; // foto temporária antes de salvar o ponto
 
 // ════════════════════════════════
 //  PERSISTÊNCIA
@@ -567,6 +605,7 @@ function defaultTypes(){
 function saveSettings(){
   settings.spd=document.getElementById('set-spd').value;
   settings.coord=document.getElementById('set-coord').value;
+  settings.rodovia=(document.getElementById('set-rodovia').value||'').trim().toUpperCase();
   save();updateOdo();
 }
 
@@ -693,6 +732,7 @@ function renderPoints(){
       if(p.l) dims.push('C:'+p.l+'m');
       if(p.h) dims.push('E:'+p.h+'cm');
       const coordStr=p.lat?fmtCoord(p.lat,p.lon):'—';
+      const photoHtml=p.photo?`<img class="pt-photo-thumb" src="${p.photo}" alt="foto" onclick="viewPhoto(${i})">`:'';
       return`<div class="pt-item">
         <div class="pt-num">${i+1}</div>
         <div class="pt-info">
@@ -701,6 +741,7 @@ function renderPoints(){
           <div class="pt-coords">${coordStr}</div>
           ${dims.length?`<div class="pt-dims">📏 ${dims.join(' ')}</div>`:''}
         </div>
+        ${photoHtml}
         <button class="pt-del" data-idx="${i}" onclick="askDelPoint(${i})">🗑</button>
       </div>`;
     }).join('');
@@ -846,6 +887,11 @@ function applyEdit(){
 //  PONTOS
 // ════════════════════════════════
 function openAddPoint(){
+  // Verifica limite de fotos (aviso prévio)
+  const photoCount=points.filter(p=>p.photo).length;
+  if(photoCount>=30){
+    alert('⚠️ Limite de 30 fotos atingido!\nExporte o levantamento atual antes de registrar mais pontos com foto.');
+  }
   const sel=document.getElementById('pt-type');
   sel.innerHTML=pointTypes.map(t=>`<option>${t}</option>`).join('');
   document.getElementById('pt-obs').value='';
@@ -854,17 +900,45 @@ function openAddPoint(){
   document.getElementById('pt-h').value='';
   const coordStr=curLat?fmtFull(curKm)+' · '+fmtCoord(curLat,curLon):fmtFull(curKm);
   document.getElementById('pt-km-val').value=coordStr;
+  // Reseta estado da foto
+  tempPhoto=null;
+  document.getElementById('pt-photo-btn').innerHTML='📷 Tirar Foto (opcional)';
+  document.getElementById('pt-photo-btn').className='btn-camera';
+  document.getElementById('modal-photo-preview').style.display='none';
   openModal('modal-pt');
 }
 function savePoint(){
-  points.push({
+  const photoCount=points.filter(p=>p.photo).length;
+  if(tempPhoto && photoCount>=30){
+    if(!confirm('Limite de 30 fotos atingido.\nSalvar ponto sem foto?')) return;
+    tempPhoto=null;
+  }
+  const p={
     type:document.getElementById('pt-type').value,
     obs:document.getElementById('pt-obs').value.trim(),
     w:document.getElementById('pt-w').value||null,
     l:document.getElementById('pt-l').value||null,
     h:document.getElementById('pt-h').value||null,
-    km:curKm,lat:curLat,lon:curLon
-  });
+    km:curKm,lat:curLat,lon:curLon,
+    photo:tempPhoto||null
+  };
+  points.push(p);
+  // Salva foto na galeria se disponível
+  if(tempPhoto && typeof window.NativeSave!=='undefined' && window.NativeSave.saveToGallery){
+    try{
+      const b64=tempPhoto.split(',')[1];
+      const idx2=String(points.length).padStart(2,'0');
+      window.NativeSave.saveToGallery(b64,'ponto_'+idx2+'_'+dateSuffix()+'.jpg');
+    }catch(e){console.warn('Erro ao salvar na galeria:',e);}
+  }
+  tempPhoto=null;
+  // Avisos de limite de fotos
+  const newCount=points.filter(x=>x.photo).length;
+  if(newCount===25){
+    setTimeout(()=>alert('⚠️ 25 fotos tiradas — faltam 5 para o limite!\nSalve ou exporte o levantamento em breve.'),300);
+  } else if(newCount===30){
+    setTimeout(()=>alert('🛑 30 fotos atingido — LIMITE MÁXIMO!\nExporte o levantamento agora antes de continuar.'),300);
+  }
   closeModal('modal-pt');
   renderPoints();updateOdo();save();
 }
@@ -900,6 +974,7 @@ function openSettings(){
   document.getElementById('settings-panel').classList.add('open');
   document.getElementById('set-spd').value=settings.spd;
   document.getElementById('set-coord').value=settings.coord;
+  document.getElementById('set-rodovia').value=settings.rodovia||'';
   renderTypes();
 }
 function closeSettings(){document.getElementById('settings-panel').classList.remove('open');}
@@ -953,10 +1028,11 @@ async function nativeShare(blob, name, title){
   dl(blob,name);
 }
 
-function buildKML(){
+function buildKML(withPhotoRefs){
+  const rodovia=settings.rodovia||'';
   let kml=`<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document>
-  <name>Odômetro Rodovia Pro</name>
+  <name>Odômetro Rodovia Pro${rodovia?' — '+rodovia:''}</name>
   <description>Levantamento DVAbrao — ${new Date().toLocaleString('pt-BR')}</description>
   <Style id="track"><LineStyle><color>ff0000ff</color><width>3</width></LineStyle></Style>
   <Style id="pt"><IconStyle><Icon><href>http://maps.google.com/mapfiles/ms/icons/red-dot.png</href></Icon></IconStyle></Style>\n`;
@@ -969,9 +1045,12 @@ function buildKML(){
   points.forEach((p,i)=>{
     if(!p.lat) return;
     const dims=[p.w?'Largura: '+p.w+' m':'',p.l?'Comprimento: '+p.l+' m':'',p.h?'Espessura: '+p.h+' cm':''].filter(Boolean).join(', ');
+    const fname=`ponto_${String(i+1).padStart(2,'0')}.jpg`;
+    const photoDesc=withPhotoRefs&&p.photo?`<![CDATA[${p.obs?esc(p.obs)+'<br>':''}${dims?esc(dims)+'<br>':''}<img src="images/${fname}" width="300">]]>`:
+      (p.obs||dims?esc(p.obs)+(dims?'\n'+esc(dims):''):'');
     kml+=`  <Placemark>
-    <name>${esc(p.type)} · ${fmtFull(p.km)}</name>
-    <description>${esc(p.obs)}${dims?'\n'+esc(dims):''}</description>
+    <name>${esc(p.type)} · ${fmtFull(p.km)}${rodovia?' ('+rodovia+')':''}</name>
+    <description>${photoDesc}</description>
     <styleUrl>#pt</styleUrl>
     <Point><coordinates>${p.lon},${p.lat},0</coordinates></Point>
   </Placemark>\n`;
@@ -979,20 +1058,41 @@ function buildKML(){
   return kml+`</Document></kml>`;
 }
 
+async function buildKMZBlob(){
+  const zip=new window.JSZip();
+  const hasPhotos=points.some(p=>p.photo);
+  zip.file('doc.kml',buildKML(hasPhotos));
+  if(hasPhotos){
+    const imgFolder=zip.folder('images');
+    points.forEach((p,i)=>{
+      if(!p.photo) return;
+      const b64=p.photo.split(',')[1];
+      const fname=`ponto_${String(i+1).padStart(2,'0')}.jpg`;
+      imgFolder.file(fname,b64,{base64:true});
+    });
+  }
+  return await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+}
+
 function buildRelatorioHTML(){
   const dt=new Date().toLocaleString('pt-BR');
+  const hasPhotos=points.some(p=>p.photo);
+  const rodovia=settings.rodovia||'';
   const rows=points.map((p,i)=>{
     const dims=[p.w?'L: '+p.w+' m':'',p.l?'C: '+p.l+' m':'',p.h?'E: '+p.h+' cm':''].filter(Boolean).join(' | ');
     const coord=p.lat?p.lat.toFixed(6)+', '+p.lon.toFixed(6):'—';
+    const photoCell=hasPhotos?(p.photo?`<td style="text-align:center;padding:4px"><img src="${p.photo}" style="width:80px;height:60px;object-fit:cover;border-radius:4px;"></td>`:'<td></td>'):'';
     return`<tr>
       <td style="text-align:center">${i+1}</td>
       <td><b>${esc(p.type)}</b>${p.obs?'<br><i style="color:#555">'+esc(p.obs)+'</i>':''}</td>
       <td style="text-align:center;white-space:nowrap">${fmtFull(p.km)}</td>
       <td style="font-family:monospace;font-size:9px">${coord}</td>
       <td style="font-size:10px">${dims||'—'}</td>
+      ${photoCell}
     </tr>`;
   }).join('');
   const secInfo=secIni!=null?`KM Início: ${fmtFull(secIni)} | KM Fim: ${fmtFull(secFim)} | Extensão: ${fmtFull(Math.abs((secFim||0)-(secIni||0)))}`:'';
+  const photoHeader=hasPhotos?'<th>Foto</th>':'';
   return`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1036,11 +1136,11 @@ tr:nth-child(even) td{background:#f4f4f4;}
     <div class="empresa">DVAbrao Serviços Ltda</div>
     <div class="subtitulo">Odômetro Rodovia Pro &nbsp;·&nbsp; Gerado em: ${dt}</div>
     <div class="info-linha">
-      KM Inicial: ${fmtFull(kmIni)} &nbsp;|&nbsp; Sentido: ${dir==='C'?'Crescente':'Decrescente'}${secInfo?' &nbsp;|&nbsp; '+secInfo:''}
+      ${rodovia?'Rodovia: '+rodovia+' &nbsp;|&nbsp; ':''}KM Inicial: ${fmtFull(kmIni)} &nbsp;|&nbsp; Sentido: ${dir==='C'?'Crescente':'Decrescente'}${secInfo?' &nbsp;|&nbsp; '+secInfo:''}
     </div>
   </div>
   <table>
-    <thead><tr><th>#</th><th>Tipo / Descrição</th><th>KM</th><th>Coordenadas</th><th>Dimensões</th></tr></thead>
+    <thead><tr><th>#</th><th>Tipo / Descrição</th><th>KM</th><th>Coordenadas</th><th>Dimensões</th>${photoHeader}</tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="rodape">Total: ${points.length} ponto(s)</div>
@@ -1052,16 +1152,14 @@ tr:nth-child(even) td{background:#f4f4f4;}
 async function shareOrDl(tipo){
   const suf=dateSuffix();
   if(tipo==='kml'){
-    const blob=new Blob([buildKML()],{type:'application/vnd.google-earth.kml+xml'});
+    const blob=new Blob([buildKML(false)],{type:'application/vnd.google-earth.kml+xml'});
     await nativeShare(blob,'OdometroRodovia_'+suf+'.kml','Levantamento KML');
   } else if(tipo==='kmz'){
     try{
-      const zip=new window.JSZip();
-      zip.file('doc.kml',buildKML());
-      const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+      const blob=await buildKMZBlob();
       await nativeShare(blob,'OdometroRodovia_'+suf+'.kmz','Levantamento KMZ');
     }catch(e){
-      const blob=new Blob([buildKML()],{type:'application/vnd.google-earth.kml+xml'});
+      const blob=new Blob([buildKML(false)],{type:'application/vnd.google-earth.kml+xml'});
       await nativeShare(blob,'OdometroRodovia_'+suf+'.kml','Levantamento KML');
     }
   } else if(tipo==='rel'){
@@ -1091,6 +1189,117 @@ function dl(blob,name){const a=document.createElement('a');a.href=URL.createObje
 function dateSuffix(){return new Date().toISOString().slice(0,10).replace(/-/g,'');}
 
 // ════════════════════════════════
+//  CÂMERA E MARCA D'ÁGUA
+// ════════════════════════════════
+function capturePhotoForModal(){
+  const photoCount=points.filter(p=>p.photo).length;
+  if(photoCount>=30){
+    alert('⚠️ Limite de 30 fotos atingido.\nExporte antes de tirar mais fotos.');
+    return;
+  }
+  document.getElementById('cam-input').click();
+}
+
+function viewPhoto(idx){
+  const p=points[idx];
+  if(!p||!p.photo) return;
+  const w=window.open('','_blank');
+  if(w){
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Foto — Ponto ${idx+1}</title>
+<style>body{margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+img{max-width:100%;max-height:100vh;object-fit:contain;}</style></head>
+<body><img src="${p.photo}"></body></html>`);
+    w.document.close();
+  }
+}
+
+function drawWatermark(ctx, w, h, pointData){
+  const{type,km,lat,lon,obs}=pointData;
+  const rodovia=settings.rodovia||'';
+  const now=new Date();
+  const dd=String(now.getDate()).padStart(2,'0');
+  const mm=String(now.getMonth()+1).padStart(2,'0');
+  const yy=String(now.getFullYear()).slice(2);
+  const lines=[
+    {text:'DVABRAO SERVIÇOS LTDA',bold:true,color:'#FFD740'},
+    {text:(type||'').toUpperCase(),bold:true,color:'#FFFFFF'},
+    {text:rodovia?rodovia+' — '+fmtFull(km):fmtFull(km),bold:false,color:'#FFFFFF'},
+  ];
+  if(lat!=null) lines.push({text:lat.toFixed(6)+', '+lon.toFixed(6),bold:false,color:'#FFFFFF',mono:true});
+  lines.push({text:dd+'/'+mm+'/'+yy,bold:false,color:'#FFFFFF'});
+  if(obs&&obs.trim()) lines.push({text:obs.substring(0,50),bold:false,color:'#CCCCCC'});
+
+  const fs=16, lineH=fs*1.4, padH=12, padV=10, borderW=5;
+  let maxW=0;
+  lines.forEach(l=>{
+    ctx.font=(l.mono?`${fs}px monospace`:(l.bold?`bold ${fs}px 'Segoe UI',Arial,sans-serif`:`${fs}px 'Segoe UI',Arial,sans-serif`));
+    const tw=ctx.measureText(l.text).width;
+    if(tw>maxW) maxW=tw;
+  });
+  const boxW=maxW+padH*2+borderW;
+  const boxH=lines.length*lineH+padV*2;
+  const x=w-boxW-12, y=h-boxH-12;
+  const r=8;
+
+  // Fundo navy arredondado
+  ctx.fillStyle='rgba(17,29,61,0.88)';
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+boxW-r,y); ctx.quadraticCurveTo(x+boxW,y,x+boxW,y+r);
+  ctx.lineTo(x+boxW,y+boxH-r); ctx.quadraticCurveTo(x+boxW,y+boxH,x+boxW-r,y+boxH);
+  ctx.lineTo(x+r,y+boxH); ctx.quadraticCurveTo(x,y+boxH,x,y+boxH-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath(); ctx.fill();
+
+  // Borda amarela esquerda
+  ctx.fillStyle='#FFD740';
+  ctx.beginPath();
+  ctx.moveTo(x,y+r); ctx.lineTo(x,y+boxH-r); ctx.quadraticCurveTo(x,y+boxH,x+r,y+boxH);
+  ctx.lineTo(x+borderW,y+boxH); ctx.lineTo(x+borderW,y); ctx.lineTo(x+r,y);
+  ctx.quadraticCurveTo(x,y,x,y+r); ctx.closePath(); ctx.fill();
+
+  // Texto alinhado à direita
+  ctx.textAlign='right';
+  lines.forEach((l,i)=>{
+    ctx.font=(l.mono?`${fs}px monospace`:(l.bold?`bold ${fs}px 'Segoe UI',Arial,sans-serif`:`${fs}px 'Segoe UI',Arial,sans-serif`));
+    ctx.fillStyle=l.color;
+    ctx.fillText(l.text, x+boxW-padH, y+padV+(i+1)*lineH-3);
+  });
+}
+
+async function processPhoto(file, pointData){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      const TW=1280, TH=960;
+      const scale=Math.min(TW/img.width, TH/img.height);
+      const dw=Math.round(img.width*scale), dh=Math.round(img.height*scale);
+      const canvas=document.createElement('canvas');
+      canvas.width=TW; canvas.height=TH;
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle='#000'; ctx.fillRect(0,0,TW,TH);
+      ctx.drawImage(img,Math.round((TW-dw)/2),Math.round((TH-dh)/2),dw,dh);
+      drawWatermark(ctx,TW,TH,pointData);
+      // Legenda do criador (pequena, canto inferior esquerdo)
+      ctx.font='11px Arial,sans-serif';
+      ctx.fillStyle='rgba(255,255,255,0.45)';
+      ctx.textAlign='left';
+      ctx.fillText('Odômetro Rodovia Pro · DVAbrao',8,TH-6);
+      canvas.toBlob(blob=>{
+        const reader=new FileReader();
+        reader.onload=e=>resolve(e.target.result);
+        reader.readAsDataURL(blob);
+      },'image/jpeg',0.70);
+    };
+    img.onerror=reject;
+    img.src=url;
+  });
+}
+
+// ════════════════════════════════
 //  LOGO FALLBACK
 // ════════════════════════════════
 function useFallbackLogo(){
@@ -1106,6 +1315,35 @@ updateOdo();
 updateTrackUI();
 renderPoints();
 startGps();
+
+// Handler da câmera
+(function(){
+  const camInput=document.getElementById('cam-input');
+  if(!camInput) return;
+  camInput.addEventListener('change',async function(e){
+    const file=e.target.files[0];
+    e.target.value='';
+    if(!file) return;
+    const btn=document.getElementById('pt-photo-btn');
+    const preview=document.getElementById('modal-photo-preview');
+    const prevHtml=btn?btn.innerHTML:'';
+    if(btn) btn.innerHTML='⏳ Processando...';
+    try{
+      const pointData={
+        type:document.getElementById('pt-type').value,
+        km:curKm, lat:curLat, lon:curLon,
+        obs:document.getElementById('pt-obs').value.trim()
+      };
+      tempPhoto=await processPhoto(file,pointData);
+      if(btn){btn.innerHTML='✅ Foto tirada — toque para substituir';btn.classList.add('has-photo');}
+      if(preview){preview.src=tempPhoto;preview.style.display='block';}
+    }catch(err){
+      console.error('Erro ao processar foto:',err);
+      if(btn) btn.innerHTML=prevHtml;
+      alert('Erro ao processar a foto. Tente novamente.');
+    }
+  });
+})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </body>

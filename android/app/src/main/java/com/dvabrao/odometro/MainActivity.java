@@ -3,16 +3,22 @@ package com.dvabrao.odometro;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.IBinder;
+import android.provider.MediaStore;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.JsResult;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -37,10 +43,12 @@ public class MainActivity extends Activity {
             "https://appassets.androidplatform.net/assets/www/index.html";
 
     private static final int REQ_LOCATION = 1;
+    private static final int REQ_FILE_CHOOSER = 10;
 
     private WebView web;
     private GpsService gpsService;
     private boolean serviceBound = false;
+    private ValueCallback<Uri[]> fileChooserCallback;
 
     // ── Conexão com o GpsService ──────────────────────────────────────
     private final ServiceConnection serviceConn = new ServiceConnection() {
@@ -65,6 +73,60 @@ public class MainActivity extends Activity {
             gpsService = null;
         }
     };
+
+    // ── Ponte para salvar fotos na galeria ───────────────────────────────
+    private class NativeSaveBridge {
+
+        /**
+         * Recebe imagem JPEG em base64 e salva na galeria, pasta "Odometro Rodovia".
+         * Chamada pelo JS: window.NativeSave.saveToGallery(base64, fileName)
+         */
+        @JavascriptInterface
+        public void saveToGallery(final String base64, final String fileName) {
+            runOnUiThread(() -> {
+                try {
+                    byte[] data = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+                    final String folderName = "Odometro Rodovia";
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        // Android 10+: usa MediaStore sem permissão WRITE_EXTERNAL_STORAGE
+                        ContentValues values = new ContentValues();
+                        values.put(MediaStore.Images.Media.DISPLAY_NAME, fileName);
+                        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+                        values.put(MediaStore.Images.Media.RELATIVE_PATH,
+                                Environment.DIRECTORY_PICTURES + "/" + folderName);
+                        values.put(MediaStore.Images.Media.IS_PENDING, 1);
+
+                        Uri uri = getContentResolver().insert(
+                                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                        if (uri != null) {
+                            try (java.io.OutputStream os = getContentResolver().openOutputStream(uri)) {
+                                if (os != null) os.write(data);
+                            }
+                            values.clear();
+                            values.put(MediaStore.Images.Media.IS_PENDING, 0);
+                            getContentResolver().update(uri, values, null, null);
+                            android.util.Log.d("NativeSave", "Foto salva: " + fileName);
+                        }
+                    } else {
+                        // Android 9 e abaixo
+                        java.io.File dir = new java.io.File(
+                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                                folderName);
+                        dir.mkdirs();
+                        java.io.File outFile = new java.io.File(dir, fileName);
+                        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile)) {
+                            fos.write(data);
+                        }
+                        sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                                Uri.fromFile(outFile)));
+                    }
+                } catch (Exception e) {
+                    android.util.Log.e("NativeSave", "Erro ao salvar foto: " + e.getMessage(), e);
+                }
+            });
+        }
+    }
 
     // ── Ponte de compartilhamento nativo ──────────────────────────────
     private class NativeShareBridge {
@@ -159,6 +221,58 @@ public class MainActivity extends Activity {
             }
         });
 
+        // WebChromeClient: necessário para <input type="file"> funcionar no WebView
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView webView,
+                    ValueCallback<Uri[]> filePathCallback,
+                    FileChooserParams fileChooserParams) {
+                // Cancela callback anterior se houver
+                if (fileChooserCallback != null) {
+                    fileChooserCallback.onReceiveValue(null);
+                }
+                fileChooserCallback = filePathCallback;
+
+                // Cria intent para câmera
+                Intent camIntent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+                // Cria intent de seleção geral (galeria/câmera)
+                Intent chooser = fileChooserParams.createIntent();
+                Intent finalIntent = Intent.createChooser(chooser, "Selecionar imagem");
+                // Adiciona câmera como opção extra
+                finalIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{camIntent});
+
+                try {
+                    startActivityForResult(finalIntent, REQ_FILE_CHOOSER);
+                } catch (Exception e) {
+                    fileChooserCallback = null;
+                    android.util.Log.e("FileChooser", "Erro: " + e.getMessage(), e);
+                    return false;
+                }
+                return true;
+            }
+
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
+                new android.app.AlertDialog.Builder(MainActivity.this)
+                        .setMessage(message)
+                        .setPositiveButton("OK", (d, w) -> result.confirm())
+                        .setCancelable(false)
+                        .show();
+                return true;
+            }
+
+            @Override
+            public boolean onJsConfirm(WebView view, String url, String message, JsResult result) {
+                new android.app.AlertDialog.Builder(MainActivity.this)
+                        .setMessage(message)
+                        .setPositiveButton("OK", (d, w) -> result.confirm())
+                        .setNegativeButton("Cancelar", (d, w) -> result.cancel())
+                        .setCancelable(false)
+                        .show();
+                return true;
+            }
+        });
+
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -169,9 +283,10 @@ public class MainActivity extends Activity {
         s.setGeolocationEnabled(true);
         s.setUserAgentString(s.getUserAgentString() + " OdometroApp/1.0");
 
-        // Injeta pontes JS: window.NativeGPS e window.NativeShare
+        // Injeta pontes JS: window.NativeGPS, window.NativeShare, window.NativeSave
         web.addJavascriptInterface(new GpsBridge(), "NativeGPS");
         web.addJavascriptInterface(new NativeShareBridge(), "NativeShare");
+        web.addJavascriptInterface(new NativeSaveBridge(), "NativeSave");
 
         if (state != null) web.restoreState(state);
         else               web.loadUrl(START_URL);
@@ -228,6 +343,30 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(this, GpsService.class);
         startForegroundService(intent);
         bindService(intent, serviceConn, BIND_AUTO_CREATE);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_FILE_CHOOSER) {
+            if (fileChooserCallback == null) return;
+            Uri[] results = null;
+            if (resultCode == Activity.RESULT_OK) {
+                if (data != null) {
+                    String dataString = data.getDataString();
+                    if (dataString != null) {
+                        results = new Uri[]{Uri.parse(dataString)};
+                    } else if (data.getClipData() != null) {
+                        // Múltiplos arquivos selecionados (não esperado mas tratado)
+                        results = new Uri[]{data.getClipData().getItemAt(0).getUri()};
+                    }
+                }
+                // Se data == null mas RESULT_OK: câmera pode ter devolvido via thumbnail
+                // O WebView vai receber null e retornar vazio, que é aceitável
+            }
+            fileChooserCallback.onReceiveValue(results);
+            fileChooserCallback = null;
+        }
     }
 
     @Override
