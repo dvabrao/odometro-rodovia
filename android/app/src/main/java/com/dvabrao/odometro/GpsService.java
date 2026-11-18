@@ -112,6 +112,7 @@ public class GpsService extends Service {
         LocationRequest request = new LocationRequest.Builder(
                 Priority.PRIORITY_HIGH_ACCURACY, INTERVAL_MS)
                 .setMinUpdateIntervalMillis(MIN_INTERVAL_MS)
+                .setWaitForAccurateLocation(false)  // entrega posição de rede imediatamente, sem esperar GPS preciso
                 .build();
 
         try {
