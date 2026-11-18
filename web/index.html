@@ -501,6 +501,41 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   </div>
 
   <div class="settings-section" style="margin-top:4px;">
+    <h3>Campos da Marca d'água</h3>
+    <p style="font-size:12px;color:var(--sub);margin-bottom:8px;">Escolha quais informações aparecem na legenda das fotos.</p>
+    <div class="card" style="padding:4px 14px;">
+      <div class="set-row" style="opacity:.55;cursor:default;">
+        <label style="font-weight:600;color:var(--yellow);">DVABRAO SERVIÇOS LTDA</label>
+        <span style="font-size:11px;color:var(--sub);font-style:italic;">sempre visível</span>
+      </div>
+      <div class="set-row">
+        <label>Tipo de patologia</label>
+        <input type="checkbox" id="wm-type" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+      </div>
+      <div class="set-row">
+        <label>Rodovia / KM</label>
+        <input type="checkbox" id="wm-km" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+      </div>
+      <div class="set-row">
+        <label>Dimensões (L / C / E)</label>
+        <input type="checkbox" id="wm-dims" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+      </div>
+      <div class="set-row">
+        <label>Coordenadas GPS</label>
+        <input type="checkbox" id="wm-coord" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+      </div>
+      <div class="set-row">
+        <label>Data</label>
+        <input type="checkbox" id="wm-date" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+      </div>
+      <div class="set-row">
+        <label>Observação</label>
+        <input type="checkbox" id="wm-obs" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section" style="margin-top:4px;">
     <h3>Unidades</h3>
     <div class="card" style="padding:4px 14px;">
       <div class="set-row">
@@ -574,7 +609,8 @@ let lastLat=null, lastLon=null, lastTime=null;
 let curLat=null, curLon=null, curAcc=0, curSpd=0;
 let watchId=null;
 let trackPoints=[], points=[], pointTypes=[];
-let settings={spd:'kmh', coord:'dd', rodovia:''};
+let settings={spd:'kmh', coord:'dd', rodovia:'',
+  wm:{type:true, km:true, coord:true, date:true, obs:true, dims:true}};
 const ACC_MAX=40, SPD_MAX=150;
 let pendingDelIdx=null;
 let tempPhoto=null; // foto temporária antes de salvar o ponto
@@ -615,6 +651,14 @@ function saveSettings(){
   settings.spd=document.getElementById('set-spd').value;
   settings.coord=document.getElementById('set-coord').value;
   settings.rodovia=(document.getElementById('set-rodovia').value||'').trim().toUpperCase();
+  settings.wm={
+    type:document.getElementById('wm-type').checked,
+    km:document.getElementById('wm-km').checked,
+    dims:document.getElementById('wm-dims').checked,
+    coord:document.getElementById('wm-coord').checked,
+    date:document.getElementById('wm-date').checked,
+    obs:document.getElementById('wm-obs').checked
+  };
   save();updateOdo();
 }
 
@@ -1001,6 +1045,13 @@ function openSettings(){
   document.getElementById('set-spd').value=settings.spd;
   document.getElementById('set-coord').value=settings.coord;
   document.getElementById('set-rodovia').value=settings.rodovia||'';
+  const wm=settings.wm||{};
+  document.getElementById('wm-type').checked=wm.type!==false;
+  document.getElementById('wm-km').checked=wm.km!==false;
+  document.getElementById('wm-dims').checked=wm.dims!==false;
+  document.getElementById('wm-coord').checked=wm.coord!==false;
+  document.getElementById('wm-date').checked=wm.date!==false;
+  document.getElementById('wm-obs').checked=wm.obs!==false;
   renderTypes();
 }
 function closeSettings(){document.getElementById('settings-panel').classList.remove('open');}
@@ -1240,20 +1291,30 @@ function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
   const iy=imgY!=null?imgY:0;
   const iw=imgW!=null?imgW:w;
   const ih=imgH!=null?imgH:h;
-  const{type,km,lat,lon,obs}=pointData;
+  const{type,km,lat,lon,obs,w,l,h}=pointData;
   const rodovia=settings.rodovia||'';
+  const wm=settings.wm||{};
   const now=new Date();
   const dd=String(now.getDate()).padStart(2,'0');
   const mm=String(now.getMonth()+1).padStart(2,'0');
   const yy=String(now.getFullYear()).slice(2);
-  const lines=[
-    {text:'DVABRAO SERVIÇOS LTDA',bold:true,color:'#FFD740'},
-    {text:(type||'').toUpperCase(),bold:true,color:'#FFFFFF'},
-    {text:rodovia?rodovia+' KM '+fmtFull(km):fmtFull(km),bold:false,color:'#FFFFFF'},
-  ];
-  if(lat!=null) lines.push({text:lat.toFixed(6)+', '+lon.toFixed(6),bold:false,color:'#FFFFFF',mono:true});
-  lines.push({text:dd+'/'+mm+'/'+yy,bold:false,color:'#FFFFFF'});
-  if(obs&&obs.trim()) lines.push({text:obs.substring(0,50),bold:false,color:'#CCCCCC'});
+  // "DVABRAO SERVIÇOS LTDA" sempre visível (versão gratuita)
+  const lines=[{text:'DVABRAO SERVIÇOS LTDA',bold:true,color:'#FFD740'}];
+  if(wm.type!==false) lines.push({text:(type||'').toUpperCase(),bold:true,color:'#FFFFFF'});
+  if(wm.km!==false){
+    const kmTxt=rodovia?rodovia+' KM '+fmtFull(km):fmtFull(km);
+    lines.push({text:kmTxt,bold:false,color:'#FFFFFF'});
+  }
+  if(wm.dims!==false){
+    const dimParts=[];
+    if(w) dimParts.push('L:'+w+'m');
+    if(l) dimParts.push('C:'+l+'m');
+    if(h) dimParts.push('E:'+h+'cm');
+    if(dimParts.length) lines.push({text:dimParts.join('  '),bold:false,color:'#E0E0E0'});
+  }
+  if(wm.coord!==false && lat!=null) lines.push({text:lat.toFixed(6)+', '+lon.toFixed(6),bold:false,color:'#FFFFFF',mono:true});
+  if(wm.date!==false) lines.push({text:dd+'/'+mm+'/'+yy,bold:false,color:'#FFFFFF'});
+  if(wm.obs!==false && obs&&obs.trim()) lines.push({text:obs.substring(0,50),bold:false,color:'#CCCCCC'});
 
   const fs=30, lineH=fs*1.4, padH=20, padV=14, borderW=8;
   let maxW=0;
@@ -1353,7 +1414,10 @@ startGps();
       const pointData={
         type:document.getElementById('pt-type').value,
         km:curKm, lat:curLat, lon:curLon,
-        obs:document.getElementById('pt-obs').value.trim()
+        obs:document.getElementById('pt-obs').value.trim(),
+        w:document.getElementById('pt-w').value||null,
+        l:document.getElementById('pt-l').value||null,
+        h:document.getElementById('pt-h').value||null
       };
       tempPhoto=await processPhoto(file,pointData);
       if(btn){btn.innerHTML='✅ Foto tirada — toque para substituir';btn.classList.add('has-photo');}
