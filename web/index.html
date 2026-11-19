@@ -506,7 +506,7 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   </div>
 
   <!-- ── ACORDEÃO 1: Patologias ── -->
-  <div class="acc-item open" id="acc-patologias">
+  <div class="acc-item" id="acc-patologias">
     <div class="acc-hdr" onclick="toggleAcc('acc-patologias')">
       <div class="acc-hdr-left">
         <span class="acc-hdr-icon">🛣️</span>
@@ -684,6 +684,8 @@ const ACC_MAX=40, SPD_MAX=150;
 let pendingDelIdx=null;
 let tempPhoto=null; // foto temporária antes de salvar o ponto
 let editPointIdx=-1;  // -1 = novo ponto; >=0 = editando ponto existente
+// Coordenadas/KM congelados no momento do clique em "Registrar Ponto"
+let frozenKm=null, frozenLat=null, frozenLon=null;
 
 // ════════════════════════════════
 //  PERSISTÊNCIA
@@ -1112,7 +1114,9 @@ function openAddPoint(){
     alert('⚠️ Limite de 30 fotos atingido!\nExporte o levantamento atual antes de registrar mais pontos com foto.');
   }
   editPointIdx=-1;
-  const coordStr=curLat?fmtFull(curKm)+' · '+fmtCoord(curLat,curLon):fmtFull(curKm);
+  // Congela KM e coordenadas no instante do clique — mesmo com carro em movimento
+  frozenKm=curKm; frozenLat=curLat; frozenLon=curLon;
+  const coordStr=frozenLat?fmtFull(frozenKm)+' · '+fmtCoord(frozenLat,frozenLon):fmtFull(frozenKm);
   _populatePtModal(null,'','','','',coordStr,null,'📍 Registrar Ponto');
   openModal('modal-pt');
 }
@@ -1154,7 +1158,8 @@ function savePoint(){
     if(!confirm('Limite de 30 fotos atingido.\nSalvar ponto sem foto?')) return;
     tempPhoto=null;
   }
-  const p={type,obs,w,l,h,km:curKm,lat:curLat,lon:curLon,photo:tempPhoto||null};
+  // Usa coordenadas/KM congelados no momento do clique — não a posição atual
+  const p={type,obs,w,l,h,km:frozenKm??curKm,lat:frozenLat??curLat,lon:frozenLon??curLon,photo:tempPhoto||null};
   points.push(p);
   // Salva foto na galeria se disponível
   if(tempPhoto && typeof window.NativeSave!=='undefined' && window.NativeSave.saveToGallery){
