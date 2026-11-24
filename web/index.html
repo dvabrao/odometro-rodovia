@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Odômetro Rodovia Pro</title>
+<title>SLIR — Levantamentos de Rodovias</title>
 <style>
 :root{
   --blue:#111D3D;--blue2:#1A2F5E;--green:#1B5E20;--green2:#2E7D32;
@@ -211,6 +211,12 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
 .set-row select{padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;
   font-size:13px;color:var(--text);outline:none;background:#fff;}
 
+/* ── BORDO CHIPS ── */
+.bordo-chips{display:flex;flex-wrap:wrap;gap:7px;}
+.bordo-chip{padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;
+  border:1.5px solid var(--border);background:#fff;color:var(--sub);transition:all .15s;}
+.bordo-chip.sel{background:#E8F5E9;border-color:#2E7D32;color:#1B5E20;}
+
 /* ── CAMERA BUTTON ── */
 .btn-camera{width:100%;padding:11px;background:#E3F2FD;color:#1565C0;border:1.5px solid #90CAF9;
   border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;
@@ -285,8 +291,8 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     </div>
   </div>
   <div class="header-title">
-    <h1>Odômetro Rodovia Pro</h1>
-    <p>DVAbrao Serviços Ltda</p>
+    <h1>SLIR</h1>
+    <p>Sistema de Levantamentos Inteligentes de Rodovias</p>
   </div>
   <button class="btn-icon" onclick="openSettings()">⚙️</button>
 </div>
@@ -426,6 +432,14 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
     <div class="field">
       <label>Observação livre</label>
       <textarea id="pt-obs" rows="2" placeholder="Detalhes adicionais..."></textarea>
+    </div>
+    <div class="field">
+      <label>Bordo / Localização</label>
+      <div class="bordo-chips">
+        <button type="button" class="bordo-chip" id="bordo-E"  onclick="selectBordo('E')">◀ Bordo Esquerdo</button>
+        <button type="button" class="bordo-chip" id="bordo-D"  onclick="selectBordo('D')">▶ Bordo Direito</button>
+        <button type="button" class="bordo-chip" id="bordo-CC" onclick="selectBordo('CC')">⬛ Canteiro Central</button>
+      </div>
     </div>
     <div class="field">
       <label>Dimensões (opcional)</label>
@@ -596,6 +610,14 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
           <input type="checkbox" id="wm-km" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
         </div>
         <div class="set-row">
+          <label>Sentido (Crescente/Decrescente)</label>
+          <input type="checkbox" id="wm-sentido" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+        </div>
+        <div class="set-row">
+          <label>Bordo / Localização</label>
+          <input type="checkbox" id="wm-bordo" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
+        </div>
+        <div class="set-row">
           <label>Dimensões (L / C / E)</label>
           <input type="checkbox" id="wm-dims" onchange="saveSettings()" style="width:20px;height:20px;cursor:pointer;">
         </div>
@@ -635,11 +657,11 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
           </div>
           <div class="about-name">
             <h4>DVABRAO SERVIÇOS LTDA</h4>
-            <p>Odômetro Rodovia Pro · <span id="about-ver">Versão 2.0</span></p>
+            <p>SLIR · <span id="about-ver">Versão 2.0</span></p>
           </div>
         </div>
         <div class="about-body">
-          <p>App de levantamento de patologias rodoviárias com GPS e exportação KML/PDF.</p>
+          <p>Sistema de Levantamentos Inteligentes de Rodovias · GPS, registro de patologias e exportação KML/PDF.</p>
           <p class="about-hint">Toque para ver informações completas →</p>
         </div>
       </div>
@@ -653,10 +675,10 @@ input:checked+.toggle-slider:before{transform:translateX(22px);}
   <div class="about-full-logo">
     <img src="dvabrao-logo.png" onerror="this.parentElement.innerHTML='<span style=\'font-size:32px;font-weight:800;color:#003F87\'>DVA</span>'" style="width:100%;height:100%;object-fit:contain;">
   </div>
-  <div class="about-full-name">DVAbrao Serviços Ltda</div>
+  <div class="about-full-name">SLIR</div>
   <div class="about-full-sub">
-    Engenharia &amp; Infraestrutura<br>
-    Odômetro Rodovia Pro<br><br>
+    Sistema de Levantamentos Inteligentes de Rodovias<br>
+    DVAbrao Serviços Ltda<br><br>
     Levantamento de campo com GPS,<br>registro de patologias e exportação KML/PDF
   </div>
   <div class="about-full-ver"><span id="about-full-ver">Versão 2.0</span> · dvabrao.com.br</div>
@@ -686,6 +708,8 @@ let tempPhoto=null; // foto temporária antes de salvar o ponto
 let editPointIdx=-1;  // -1 = novo ponto; >=0 = editando ponto existente
 // Coordenadas/KM congelados no momento do clique em "Registrar Ponto"
 let frozenKm=null, frozenLat=null, frozenLon=null;
+// Bordo selecionado no modal ('E'=Esquerdo, 'D'=Direito, 'CC'=Canteiro Central, ''=nenhum)
+let selectedBordo='';
 
 // ════════════════════════════════
 //  PERSISTÊNCIA
@@ -725,6 +749,8 @@ function saveSettings(){
   settings.wm={
     type:document.getElementById('wm-type').checked,
     km:document.getElementById('wm-km').checked,
+    sentido:document.getElementById('wm-sentido').checked,
+    bordo:document.getElementById('wm-bordo').checked,
     dims:document.getElementById('wm-dims').checked,
     coord:document.getElementById('wm-coord').checked,
     date:document.getElementById('wm-date').checked,
@@ -859,11 +885,13 @@ function renderPoints(){
       const coordStr=p.lat?fmtCoord(p.lat,p.lon):'—';
       const photoHtml=p.photo?`<img class="pt-photo-thumb" src="${p.photo}" alt="foto" onclick="viewPhoto(${i})">`:'';
       const dimsInline=dims.length?` <span style="color:#888;font-size:11px;">(${dims.join(' ')})</span>`:'';
+      const bordoMap={'E':'◀ Bordo Esq.','D':'▶ Bordo Dir.','CC':'⬛ Canteiro'};
+      const bordoTag=p.bordo&&bordoMap[p.bordo]?` · <span style="color:#2E7D32;font-size:10px;font-weight:700;">${bordoMap[p.bordo]}</span>`:'';
       return`<div class="pt-item">
         <div class="pt-num">${i+1}</div>
         <div class="pt-info">
           <div class="pt-desc">${p.type}${dimsInline}</div>
-          <div class="pt-km">${fmtFull(p.km)}${p.obs?' · '+p.obs:''}</div>
+          <div class="pt-km">${fmtFull(p.km)}${bordoTag}${p.obs?' · '+p.obs:''}</div>
           <div class="pt-coords">${coordStr}</div>
         </div>
         ${photoHtml}
@@ -1090,12 +1118,27 @@ function applyEdit(){
 // ════════════════════════════════
 //  PONTOS
 // ════════════════════════════════
-function _populatePtModal(type,obs,w,l,h,kmCoordStr,photo,titleTxt){
+function selectBordo(b){
+  selectedBordo=(selectedBordo===b)?'':b; // toggle: clicar novamente desmarca
+  ['E','D','CC'].forEach(id=>{
+    const el=document.getElementById('bordo-'+id);
+    if(el) el.className='bordo-chip'+(selectedBordo===id?' sel':'');
+  });
+}
+function _resetBordo(b){
+  selectedBordo=b||'';
+  ['E','D','CC'].forEach(id=>{
+    const el=document.getElementById('bordo-'+id);
+    if(el) el.className='bordo-chip'+(selectedBordo===id?' sel':'');
+  });
+}
+function _populatePtModal(type,obs,bordo,w,l,h,kmCoordStr,photo,titleTxt){
   document.getElementById('modal-pt').querySelector('.modal-title').firstChild.textContent=titleTxt+' ';
   const sel=document.getElementById('pt-type');
   sel.innerHTML=pointTypes.map(t=>`<option>${t}</option>`).join('');
   if(type){const opt=[...sel.options].find(o=>o.value===type);if(opt)sel.value=type;}
   document.getElementById('pt-obs').value=obs||'';
+  _resetBordo(bordo||'');
   // Exibe com vírgula como separador decimal (padrão pt-BR)
   const toVirgula=v=>v?String(v).replace('.',','):'';
   document.getElementById('pt-w').value=toVirgula(w);
@@ -1117,7 +1160,7 @@ function openAddPoint(){
   // Congela KM e coordenadas no instante do clique — mesmo com carro em movimento
   frozenKm=curKm; frozenLat=curLat; frozenLon=curLon;
   const coordStr=frozenLat?fmtFull(frozenKm)+' · '+fmtCoord(frozenLat,frozenLon):fmtFull(frozenKm);
-  _populatePtModal(null,'','','','',coordStr,null,'📍 Registrar Ponto');
+  _populatePtModal(null,'','','','','',coordStr,null,'📍 Registrar Ponto');
   openModal('modal-pt');
 }
 function openEditPoint(idx){
@@ -1125,7 +1168,7 @@ function openEditPoint(idx){
   if(!p) return;
   editPointIdx=idx;
   const coordStr=p.lat?fmtFull(p.km)+' · '+fmtCoord(p.lat,p.lon):fmtFull(p.km);
-  _populatePtModal(p.type,p.obs,p.w,p.l,p.h,coordStr,p.photo,'✏️ Editar Ponto #'+(idx+1));
+  _populatePtModal(p.type,p.obs,p.bordo||'',p.w,p.l,p.h,coordStr,p.photo,'✏️ Editar Ponto #'+(idx+1));
   openModal('modal-pt');
 }
 // Converte valor digitado (aceita vírgula ou ponto) para número ou null
@@ -1137,6 +1180,7 @@ function parseDimField(id){
 function savePoint(){
   const type=document.getElementById('pt-type').value;
   const obs=document.getElementById('pt-obs').value.trim();
+  const bordo=selectedBordo||'';
   const w=parseDimField('pt-w');
   const l=parseDimField('pt-l');
   const h=parseDimField('pt-h');
@@ -1144,7 +1188,7 @@ function savePoint(){
   if(editPointIdx>=0){
     // ── MODO EDIÇÃO: atualiza ponto existente ──
     const p=points[editPointIdx];
-    p.type=type; p.obs=obs; p.w=w; p.l=l; p.h=h;
+    p.type=type; p.obs=obs; p.bordo=bordo; p.w=w; p.l=l; p.h=h;
     // Atualiza foto apenas se uma nova foi tirada
     if(tempPhoto && tempPhoto!==p.photo) p.photo=tempPhoto;
     editPointIdx=-1; tempPhoto=null;
@@ -1159,7 +1203,7 @@ function savePoint(){
     tempPhoto=null;
   }
   // Usa coordenadas/KM congelados no momento do clique — não a posição atual
-  const p={type,obs,w,l,h,km:frozenKm??curKm,lat:frozenLat??curLat,lon:frozenLon??curLon,photo:tempPhoto||null};
+  const p={type,obs,bordo,w,l,h,km:frozenKm??curKm,lat:frozenLat??curLat,lon:frozenLon??curLon,photo:tempPhoto||null};
   points.push(p);
   // Salva foto na galeria se disponível
   if(tempPhoto && typeof window.NativeSave!=='undefined' && window.NativeSave.saveToGallery){
@@ -1214,6 +1258,8 @@ function openSettings(){
   const wm=settings.wm||{};
   document.getElementById('wm-type').checked=wm.type!==false;
   document.getElementById('wm-km').checked=wm.km!==false;
+  document.getElementById('wm-sentido').checked=wm.sentido!==false;
+  document.getElementById('wm-bordo').checked=wm.bordo!==false;
   document.getElementById('wm-dims').checked=wm.dims!==false;
   document.getElementById('wm-coord').checked=wm.coord!==false;
   document.getElementById('wm-date').checked=wm.date!==false;
@@ -1468,9 +1514,10 @@ function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
   const iy=imgY!=null?imgY:0;
   const iw=imgW!=null?imgW:w;
   const ih=imgH!=null?imgH:h;
-  const{type,km,lat,lon,obs,w:dW,l:dL,h:dH}=pointData; // dW/dL/dH = dimensões do ponto
+  const{type,km,lat,lon,obs,bordo,w:dW,l:dL,h:dH}=pointData; // dW/dL/dH = dimensões do ponto
   const rodovia=settings.rodovia||'';
   const wm=settings.wm||{};
+  const bordoLabels={'E':'Bordo Esquerdo','D':'Bordo Direito','CC':'Canteiro Central'};
   const now=new Date();
   const dd=String(now.getDate()).padStart(2,'0');
   const mm=String(now.getMonth()+1).padStart(2,'0');
@@ -1481,6 +1528,13 @@ function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
   if(wm.km!==false){
     const kmTxt=rodovia?rodovia+' KM '+fmtFull(km):fmtFull(km);
     lines.push({text:kmTxt,bold:false,color:'#FFFFFF'});
+  }
+  if(wm.sentido!==false){
+    const sentidoTxt=dir==='C'?'Sentido ▲ Crescente':'Sentido ▼ Decrescente';
+    lines.push({text:sentidoTxt,bold:false,color:'#90CAF9'});
+  }
+  if(wm.bordo!==false && bordo && bordoLabels[bordo]){
+    lines.push({text:bordoLabels[bordo],bold:false,color:'#A5D6A7'});
   }
   if(wm.dims!==false){
     const dimParts=[];

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Odômetro Rodovia Pro</string>
+    <string name="app_name">SLIR</string>
     <string name="channel_name">GPS em Background</string>
     <string name="channel_desc">Mantém o rastreamento GPS ativo mesmo com a tela desligada</string>
     <string name="notif_title">Rastreamento Ativo</string>
-    <string name="notif_text">Odômetro Rodovia Pro está gravando sua rota.</string>
+    <string name="notif_text">SLIR está gravando sua rota.</string>
 </resources>
