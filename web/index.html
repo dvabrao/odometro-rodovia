@@ -1526,12 +1526,12 @@ function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
   const lines=[{text:'DVABRAO SERVIÇOS LTDA',bold:true,color:'#FFD740'}];
   if(wm.type!==false) lines.push({text:(type||'').toUpperCase(),bold:true,color:'#FFFFFF'});
   if(wm.km!==false){
-    const sentidoTxt=wm.sentido!==false?(dir==='C'?' - Sentido ▲ Crescente':' - Sentido ▼ Decrescente'):'';
+    const sentidoTxt=wm.sentido!==false?(dir==='C'?' - ▲ Crescente':' - ▼ Decrescente'):'';
     const kmTxt=(rodovia?rodovia+' KM '+fmtFull(km):fmtFull(km))+sentidoTxt;
     lines.push({text:kmTxt,bold:false,color:'#FFFFFF'});
   } else if(wm.sentido!==false){
     // Se KM desabilitado mas sentido habilitado, mostra só o sentido
-    const sentidoTxt=dir==='C'?'Sentido ▲ Crescente':'Sentido ▼ Decrescente';
+    const sentidoTxt=dir==='C'?'▲ Crescente':'▼ Decrescente';
     lines.push({text:sentidoTxt,bold:false,color:'#90CAF9'});
   }
   if(wm.bordo!==false && bordo && bordoLabels[bordo]){
