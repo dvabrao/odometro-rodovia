@@ -1521,15 +1521,16 @@ function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
   const now=new Date();
   const dd=String(now.getDate()).padStart(2,'0');
   const mm=String(now.getMonth()+1).padStart(2,'0');
-  const yy=String(now.getFullYear()).slice(2);
+  const yy=String(now.getFullYear()); // ano com 4 dígitos
   // "DVABRAO SERVIÇOS LTDA" sempre visível (versão gratuita)
   const lines=[{text:'DVABRAO SERVIÇOS LTDA',bold:true,color:'#FFD740'}];
   if(wm.type!==false) lines.push({text:(type||'').toUpperCase(),bold:true,color:'#FFFFFF'});
   if(wm.km!==false){
-    const kmTxt=rodovia?rodovia+' KM '+fmtFull(km):fmtFull(km);
+    const sentidoTxt=wm.sentido!==false?(dir==='C'?' - Sentido ▲ Crescente':' - Sentido ▼ Decrescente'):'';
+    const kmTxt=(rodovia?rodovia+' KM '+fmtFull(km):fmtFull(km))+sentidoTxt;
     lines.push({text:kmTxt,bold:false,color:'#FFFFFF'});
-  }
-  if(wm.sentido!==false){
+  } else if(wm.sentido!==false){
+    // Se KM desabilitado mas sentido habilitado, mostra só o sentido
     const sentidoTxt=dir==='C'?'Sentido ▲ Crescente':'Sentido ▼ Decrescente';
     lines.push({text:sentidoTxt,bold:false,color:'#90CAF9'});
   }
