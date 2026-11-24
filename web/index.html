@@ -1527,7 +1527,7 @@ function drawWatermark(ctx, w, h, pointData, imgX, imgY, imgW, imgH){
   if(wm.type!==false) lines.push({text:(type||'').toUpperCase(),bold:true,color:'#FFFFFF'});
   if(wm.km!==false){
     const sentidoTxt=wm.sentido!==false?(dir==='C'?' - ▲ Crescente':' - ▼ Decrescente'):'';
-    const kmTxt=(rodovia?rodovia+' KM '+fmtFull(km):fmtFull(km))+sentidoTxt;
+    const kmTxt=(rodovia?rodovia+' - KM '+fmtFull(km):fmtFull(km))+sentidoTxt;
     lines.push({text:kmTxt,bold:false,color:'#FFFFFF'});
   } else if(wm.sentido!==false){
     // Se KM desabilitado mas sentido habilitado, mostra só o sentido
